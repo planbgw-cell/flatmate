@@ -1,0 +1,144 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/di/injection.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/feed/domain/models/feed_item.dart';
+import '../../features/feed/presentation/pages/feed_detail_page.dart';
+import '../../features/feed/presentation/screens/feed_detail_screen.dart';
+import '../../features/main/presentation/main_screen.dart';
+import '../../features/main/presentation/screens/tab_screens.dart';
+import '../../features/post_create/presentation/screens/general_create_screen.dart';
+import '../../features/post_create/presentation/screens/job_create_screen.dart';
+import '../../features/post_create/presentation/screens/real_estate_create_screen.dart';
+import '../../features/property/presentation/bloc/property_bloc.dart';
+import '../../features/property/presentation/pages/property_detail_page.dart';
+import 'route_names.dart';
+
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
+GoRouter createAppRouter() {
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: RouteNames.home,
+    routes: [
+      GoRoute(
+        path: RouteNames.login,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => BlocProvider(
+          create: (_) => sl<AuthBloc>(),
+          child: const LoginPage(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.feedDetail,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is FeedItem) {
+            return FeedDetailScreen(item: extra);
+          }
+          return const Scaffold(
+            body: Center(child: Text('게시글 정보가 없습니다.')),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/home/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return FeedDetailPage(feedId: id);
+        },
+      ),
+      GoRoute(
+        path: '/property/:id',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return PropertyDetailPage(propertyId: id);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.postCreateRealEstate,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const RealEstateCreateScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.postCreateJob,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const JobCreateScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.postCreateGeneral,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const GeneralCreateScreen(),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return MainScreen(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.home,
+                builder: (context, state) => const FeedScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.property,
+                builder: (context, state) => const RealEstateScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.jobs,
+                builder: (context, state) => const JobsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.localLife,
+                builder: (context, state) => const CommunityScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.myPage,
+                builder: (context, state) => const MyPageScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+class AppBlocProviders extends StatelessWidget {
+  const AppBlocProviders({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => sl<PropertyBloc>()),
+      ],
+      child: child,
+    );
+  }
+}
