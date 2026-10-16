@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <application
-        android:label="flatmate_app"
+        android:label="Flatmate"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -26,6 +26,30 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Deep links: https://flatmate.app/share/feed/{id} -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="flatmate.app"
+                    android:pathPrefix="/share/feed"/>
+                <data
+                    android:scheme="https"
+                    android:host="flatmate.app"
+                    android:pathPrefix="/feed/detail"/>
+            </intent-filter>
+            <!-- Custom scheme: flatmate://share/feed/{id} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="flatmate"
+                    android:host="share"
+                    android:pathPrefix="/feed"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

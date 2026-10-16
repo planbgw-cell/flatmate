@@ -1,12 +1,17 @@
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/config/app_config.dart';
 import '../../data/local/local_storage.dart';
 import '../../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/login_usecase.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/chat/data/repositories/dio_chat_repository.dart';
+import '../../features/chat/data/repositories/mock_chat_repository.dart';
+import '../../features/chat/domain/repositories/chat_repository.dart';
+import '../../features/feed/data/repositories/dio_feed_repository.dart';
 import '../../features/feed/data/repositories/feed_repository_impl.dart';
 import '../../features/feed/data/repositories/mock_feed_repository.dart';
 import '../../features/feed/domain/repositories/feed_repository.dart';
@@ -15,6 +20,9 @@ import '../../features/local_life/data/datasources/local_life_remote_datasource.
 import '../../features/local_life/data/repositories/local_life_repository_impl.dart';
 import '../../features/local_life/domain/repositories/local_life_repository.dart';
 import '../../features/local_life/domain/usecases/get_local_posts_usecase.dart';
+import '../../features/location/data/repositories/dio_location_repository.dart';
+import '../../features/location/data/repositories/mock_location_repository.dart';
+import '../../features/location/domain/repositories/location_repository.dart';
 import '../../features/mypage/data/repositories/profile_repository_impl.dart';
 import '../../features/mypage/domain/repositories/profile_repository.dart';
 import '../../features/mypage/domain/usecases/get_my_profile_usecase.dart';
@@ -23,18 +31,26 @@ import '../../features/property/data/repositories/property_repository_impl.dart'
 import '../../features/property/domain/repositories/property_repository.dart';
 import '../../features/property/domain/usecases/get_properties_usecase.dart';
 import '../../features/property/presentation/bloc/property_bloc.dart';
+import '../network/api_client.dart';
 import '../network/dio_client.dart';
 import '../utils/location_service.dart';
 
 final sl = GetIt.instance;
 
 Future<void> configureDependencies() async {
-  if (sl.isRegistered<DioClient>()) return;
+  if (sl.isRegistered<ApiClient>()) return;
+
+  final config = AppConfig.resolve();
+  sl.registerSingleton<AppConfig>(config);
 
   final prefs = await SharedPreferences.getInstance();
   sl.registerSingleton<SharedPreferences>(prefs);
   sl.registerLazySingleton<LocalStorage>(() => LocalStorage(sl()));
-  sl.registerLazySingleton<DioClient>(DioClient.new);
+
+  sl.registerLazySingleton<ApiClient>(
+    () => ApiClient(storage: sl(), config: sl()),
+  );
+  sl.registerLazySingleton<DioClient>(() => DioClient(sl()));
   sl.registerLazySingleton<LocationService>(LocationService.new);
 
   sl.registerLazySingleton<AuthRemoteDataSource>(AuthRemoteDataSourceStub.new);
@@ -55,10 +71,26 @@ Future<void> configureDependencies() async {
     () => PropertyBloc(sl())..add(const PropertyLoadRequested()),
   );
 
-  sl.registerLazySingleton<MockFeedRepository>(MockFeedRepository.new);
-  sl.registerLazySingleton<FeedRepository>(
-    () => FeedRepositoryImpl(sl<MockFeedRepository>()),
-  );
+  // Mock ↔ Real repository switch (UI/providers stay unchanged).
+  if (config.useMockApi) {
+    sl.registerLazySingleton<MockFeedRepository>(MockFeedRepository.new);
+    sl.registerLazySingleton<FeedRepository>(
+      () => FeedRepositoryImpl(sl<MockFeedRepository>()),
+    );
+    sl.registerLazySingleton<ChatRepository>(MockChatRepository.new);
+    sl.registerLazySingleton<LocationRepository>(MockLocationRepository.new);
+  } else {
+    sl.registerLazySingleton<FeedRepository>(
+      () => DioFeedRepository(sl()),
+    );
+    sl.registerLazySingleton<ChatRepository>(
+      () => DioChatRepository(sl()),
+    );
+    sl.registerLazySingleton<LocationRepository>(
+      () => DioLocationRepository(sl()),
+    );
+  }
+
   sl.registerFactory(() => GetFeedPageUseCase(sl()));
 
   sl.registerLazySingleton<LocalLifeRemoteDataSource>(

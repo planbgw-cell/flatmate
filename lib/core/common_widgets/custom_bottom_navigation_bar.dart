@@ -30,9 +30,9 @@ class CustomBottomNavigationBar extends StatelessWidget {
       label: '알바',
     ),
     (
-      icon: Icons.forum_outlined,
-      activeIcon: Icons.forum,
-      label: '동네생활',
+      icon: Icons.chat_bubble_outline,
+      activeIcon: Icons.chat_bubble,
+      label: '채팅',
     ),
     (
       icon: Icons.person_outline,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../chat/presentation/screens/chat_list_screen.dart';
 import '../../../jobs/presentation/pages/jobs_page.dart';
-import '../../../local_life/presentation/pages/local_life_page.dart';
 import '../../../mypage/presentation/pages/my_page.dart';
 import '../../../property/presentation/pages/property_list_page.dart';
 
@@ -23,12 +23,12 @@ class JobsScreen extends StatelessWidget {
   Widget build(BuildContext context) => const JobsPage();
 }
 
-/// Tab 3 — 동네생활
+/// Tab 3 — 채팅
 class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const LocalLifePage();
+  Widget build(BuildContext context) => const ChatListScreen();
 }
 
 /// Tab 4 — 내 정보

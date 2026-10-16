@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/common_widgets/badge_chip.dart';
+import '../../../../core/common_widgets/image_error_widget.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -53,13 +54,8 @@ class FeedCardItem extends ConsumerWidget {
                     imageUrl: item.thumbnailUrl,
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(color: AppColors.border),
-                    errorWidget: (_, _, _) => Container(
-                      color: AppColors.border,
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.image_not_supported_outlined,
-                        color: AppColors.textHint,
-                      ),
+                    errorWidget: (_, _, _) => const ImageErrorWidget(
+                      iconSize: 28,
                     ),
                   ),
                 ),

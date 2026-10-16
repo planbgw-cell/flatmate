@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/routes/route_names.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../domain/models/feed_item.dart';
 import '../providers/feed_provider.dart';
 import '../widgets/author_profile_card.dart';
@@ -55,15 +57,26 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     return (_scrollOffset / range).clamp(0.0, 1.0);
   }
 
-  void _onCta(FeedItem item) {
-    final message = switch (item.category) {
-      FeedCategory.housing => '채팅방이 생성되었습니다.',
-      FeedCategory.job => '지원이 접수되었습니다.',
-      _ => '${item.ctaButtonLabel} — 곧 연결됩니다.',
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  Future<void> _onCta(FeedItem item) async {
+    try {
+      final roomId = await openChatForFeed(ref, item);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            item.category == FeedCategory.job
+                ? '채팅방이 열렸습니다. 지원 문의를 이어서 진행하세요.'
+                : '채팅방이 생성되었습니다.',
+          ),
+        ),
+      );
+      context.push(RouteNames.chatRoomPath(roomId));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('채팅방 연결에 실패했습니다. $e')),
+      );
+    }
   }
 
   @override

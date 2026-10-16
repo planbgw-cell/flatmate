@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/di/injection.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/chat/domain/models/chat_room.dart';
+import '../../features/chat/presentation/screens/chat_list_screen.dart';
+import '../../features/chat/presentation/screens/chat_room_screen.dart';
 import '../../features/feed/domain/models/feed_item.dart';
 import '../../features/feed/presentation/pages/feed_detail_page.dart';
 import '../../features/feed/presentation/screens/feed_detail_screen.dart';
@@ -15,15 +18,25 @@ import '../../features/post_create/presentation/screens/job_create_screen.dart';
 import '../../features/post_create/presentation/screens/real_estate_create_screen.dart';
 import '../../features/property/presentation/bloc/property_bloc.dart';
 import '../../features/property/presentation/pages/property_detail_page.dart';
+import '../../features/splash/presentation/screens/splash_screen.dart';
 import 'route_names.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter createAppRouter() {
+GoRouter createAppRouter({String? initialLocation}) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: RouteNames.home,
+    initialLocation: initialLocation ?? RouteNames.splash,
     routes: [
+      GoRoute(
+        path: RouteNames.splash,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.feed,
+        redirect: (context, state) => RouteNames.home,
+      ),
       GoRoute(
         path: RouteNames.login,
         parentNavigatorKey: _rootNavigatorKey,
@@ -43,6 +56,22 @@ GoRouter createAppRouter() {
           return const Scaffold(
             body: Center(child: Text('게시글 정보가 없습니다.')),
           );
+        },
+      ),
+      GoRoute(
+        path: RouteNames.feedDetailById,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return FeedDetailPage(feedId: id);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.shareFeed,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return FeedDetailPage(feedId: id);
         },
       ),
       GoRoute(
@@ -75,6 +104,23 @@ GoRouter createAppRouter() {
         path: RouteNames.postCreateGeneral,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const GeneralCreateScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.chat,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ChatListScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.chatRoom,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          final roomId = state.pathParameters['roomId']!;
+          final extra = state.extra;
+          return ChatRoomScreen(
+            roomId: roomId,
+            fallbackRoom: extra is ChatRoom ? extra : null,
+          );
+        },
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

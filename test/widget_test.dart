@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flatmate_app/app/app.dart';
+import 'package:flatmate_app/app/routes/app_router.dart';
+import 'package:flatmate_app/app/routes/route_names.dart';
 import 'package:flatmate_app/core/di/injection.dart';
 
 void main() {
@@ -15,7 +17,13 @@ void main() {
   });
 
   testWidgets('피드 필터·카드·새로고침 UI가 렌더링된다', (tester) async {
-    await tester.pumpWidget(ProviderScope(child: FlatmateApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        child: FlatmateApp(
+          router: createAppRouter(initialLocation: RouteNames.home),
+        ),
+      ),
+    );
     await tester.pump();
     // Mock repo delay 300–500ms + frame
     await tester.pump(const Duration(milliseconds: 700));

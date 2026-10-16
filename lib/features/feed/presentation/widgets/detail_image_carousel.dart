@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/common_widgets/image_error_widget.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -37,15 +38,7 @@ class DetailImageCarousel extends StatelessWidget {
               imageUrl: url,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: AppColors.border),
-              errorWidget: (_, _, _) => Container(
-                color: AppColors.border,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.image_not_supported_outlined,
-                  size: 48,
-                  color: AppColors.textHint,
-                ),
-              ),
+              errorWidget: (_, _, _) => const ImageErrorWidget(iconSize: 48),
             );
           },
         ),
