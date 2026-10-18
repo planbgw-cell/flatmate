@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/config/app_config.dart';
 import '../../../../app/routes/route_names.dart';
+import '../../../../core/auth/token_storage.dart';
 import '../../../../core/di/injection.dart';
-import '../../../../core/network/auth_interceptor.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/location_service.dart';
-import '../../../../data/local/local_storage.dart';
 
 /// Brand splash — warm-up then enter main feed shell.
 class SplashScreen extends StatefulWidget {
@@ -45,13 +45,13 @@ class _SplashScreenState extends State<SplashScreen>
       _warmUp(),
     ]);
     if (!mounted) return;
-    context.go(RouteNames.home);
+    final signedIn = sl<TokenStorage>().hasValidToken;
+    // Real API: first launch starts at login (sign-up → JWT); mock stays open.
+    final mustLogin = !signedIn && !sl<AppConfig>().useMockApi;
+    context.go(mustLogin ? RouteNames.login : RouteNames.home);
   }
 
   Future<void> _warmUp() async {
-    // Auth token check (presence only — login gate can be added later).
-    sl<LocalStorage>().readString(AuthInterceptor.tokenKey);
-
     // Soft location preload (ignore denial / timeout).
     try {
       await sl<LocationService>()

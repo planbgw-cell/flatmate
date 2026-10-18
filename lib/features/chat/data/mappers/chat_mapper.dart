@@ -1,60 +1,61 @@
+import '../../../feed/domain/models/feed_item.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
 
-ChatRoom chatRoomFromJson(Map<String, dynamic> json) {
+/// `ChatRoomOut` (+ feed / last message lookups) → [ChatRoom].
+///
+/// The API only returns participant ids, so the product header comes from the
+/// linked feed and the opponent nickname from the feed author when it matches.
+ChatRoom chatRoomFromJson(
+  Map<String, dynamic> json, {
+  String? myUserId,
+  FeedItem? feed,
+  ChatMessage? lastMessage,
+}) {
+  final userA = json['user_a_id']?.toString() ?? '';
+  final userB = json['user_b_id']?.toString() ?? '';
+  final peerId = userA == myUserId ? userB : userA;
+  final createdAt =
+      DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now();
+  final lastAt = DateTime.tryParse(json['last_message_at']?.toString() ?? '');
+
   return ChatRoom(
     id: json['id']?.toString() ?? '',
-    feedItemId: json['feed_item_id']?.toString() ??
-        json['feedItemId']?.toString() ??
-        '',
-    feedTitle: json['feed_title']?.toString() ??
-        json['feedTitle']?.toString() ??
-        '',
-    feedPrice: json['feed_price']?.toString() ??
-        json['feedPrice']?.toString() ??
-        '',
-    feedThumbnail: json['feed_thumbnail']?.toString() ??
-        json['feedThumbnail']?.toString() ??
-        '',
-    opponentName: json['opponent_name']?.toString() ??
-        json['opponentName']?.toString() ??
-        '',
-    opponentProfileImage: json['opponent_profile_image']?.toString() ??
-        json['opponentProfileImage']?.toString(),
-    opponentNeighborhood: json['opponent_neighborhood']?.toString() ??
-        json['opponentNeighborhood']?.toString() ??
-        '',
-    lastMessage: json['last_message']?.toString() ??
-        json['lastMessage']?.toString() ??
-        '',
-    lastMessageTime: DateTime.tryParse(
-          json['last_message_time']?.toString() ??
-              json['lastMessageTime']?.toString() ??
-              '',
-        ) ??
-        DateTime.now(),
-    unreadCount: (json['unread_count'] as num?)?.toInt() ??
-        (json['unreadCount'] as num?)?.toInt() ??
-        0,
-    dealStatus: json['deal_status']?.toString() ??
-        json['dealStatus']?.toString() ??
-        '거래가능',
+    feedItemId: json['feed_id']?.toString() ?? '',
+    feedTitle: feed?.title ?? '이웃과의 대화',
+    feedPrice: feed?.priceOrCondition ?? '',
+    feedThumbnail: feed?.thumbnailUrl ?? '',
+    opponentName: feed != null && feed.authorId == peerId
+        ? feed.authorName
+        : '이웃 $peerId',
+    opponentNeighborhood: feed?.neighborhood ?? '',
+    lastMessage: lastMessage?.message ?? '',
+    lastMessageTime: (lastMessage?.createdAt ?? lastAt ?? createdAt).toLocal(),
+    dealStatus: switch (feed?.category) {
+      FeedCategory.job => '모집중',
+      FeedCategory.market => '판매중',
+      _ => '거래가능',
+    },
   );
 }
 
-ChatMessage chatMessageFromJson(Map<String, dynamic> json) {
+/// `ChatMessageOut` → [ChatMessage]; `isMine` compares against the JWT user.
+ChatMessage chatMessageFromJson(
+  Map<String, dynamic> json, {
+  String? myUserId,
+}) {
+  final senderId = json['sender_id']?.toString() ?? '';
   return ChatMessage(
     id: json['id']?.toString() ?? '',
-    roomId: json['room_id']?.toString() ?? json['roomId']?.toString() ?? '',
-    senderId:
-        json['sender_id']?.toString() ?? json['senderId']?.toString() ?? '',
-    message: json['message']?.toString() ?? json['text']?.toString() ?? '',
-    createdAt: DateTime.tryParse(
-          json['created_at']?.toString() ?? json['createdAt']?.toString() ?? '',
-        ) ??
-        DateTime.now(),
-    isMine: json['is_mine'] as bool? ?? json['isMine'] as bool? ?? false,
+    roomId: json['room_id']?.toString() ?? '',
+    senderId: senderId,
+    message: json['content']?.toString() ?? '',
+    createdAt:
+        (DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+                DateTime.now())
+            .toLocal(),
+    isMine: myUserId != null && senderId == myUserId,
   );
 }
 
-Map<String, dynamic> chatMessageToJsonBody(String text) => {'message': text};
+Map<String, dynamic> chatMessageToJsonBody(String text) => {'content': text};

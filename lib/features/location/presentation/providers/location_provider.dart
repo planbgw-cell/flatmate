@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/utils/location_service.dart';
 import '../../domain/models/location_item.dart';
+import '../../domain/repositories/location_repository.dart';
 
 /// Discrete radius steps used by the Daangn-style slider (km).
 const kLocationRadiusSteps = <double>[1, 3, 5, 10];
@@ -87,36 +88,27 @@ final nearbyLocationCountProvider = Provider<int>((ref) {
 
 final locationSearchQueryProvider = StateProvider<String>((ref) => '');
 
-final locationSearchResultsProvider = Provider<List<LocationItem>>((ref) {
-  final query = ref.watch(locationSearchQueryProvider).trim();
-  final catalog = ref.watch(locationCatalogProvider);
-  if (query.isEmpty) return const [];
-  final lower = query.toLowerCase();
-  return catalog
-      .where(
-        (loc) =>
-            loc.dongName.toLowerCase().contains(lower) ||
-            loc.districtName.toLowerCase().contains(lower) ||
-            loc.cityName.toLowerCase().contains(lower) ||
-            loc.fullName.toLowerCase().contains(lower),
-      )
-      .toList();
+final locationRepositoryProvider = Provider<LocationRepository>((ref) {
+  return sl<LocationRepository>();
 });
 
-/// Find nearest catalog dong from device GPS (falls back to 신촌동).
+/// Dong search via [LocationRepository] (Mock catalog or `GET /locations?q=`).
+final locationSearchResultsProvider =
+    FutureProvider<List<LocationItem>>((ref) async {
+  final query = ref.watch(locationSearchQueryProvider).trim();
+  if (query.isEmpty) return const [];
+  // Debounce keystrokes; a newer query disposes this one.
+  await Future<void>.delayed(const Duration(milliseconds: 250));
+  return ref.read(locationRepositoryProvider).search(query);
+});
+
+/// Nearest dong for device GPS (falls back to 신촌동).
 Future<LocationItem> resolveLocationFromGps() async {
   final fix = await sl<LocationService>().currentPosition();
-  final catalog = buildMockLocations();
   if (fix == null) return kDefaultLocation;
-
-  LocationItem nearest = catalog.first;
-  var best = double.infinity;
-  for (final loc in catalog) {
-    final d = loc.distanceKmToCoords(fix.latitude, fix.longitude);
-    if (d < best) {
-      best = d;
-      nearest = loc;
-    }
-  }
-  return nearest;
+  final nearest = await sl<LocationRepository>().reverseGeo(
+    latitude: fix.latitude,
+    longitude: fix.longitude,
+  );
+  return nearest ?? kDefaultLocation;
 }

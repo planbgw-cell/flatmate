@@ -47,6 +47,11 @@ class _LocationSelectModalState extends ConsumerState<LocationSelectModal> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${nearest.dongName}으로 설정했어요.')),
       );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('내 위치로 동네를 찾지 못했어요.')),
+      );
     } finally {
       if (mounted) setState(() => _gpsLoading = false);
     }
@@ -56,7 +61,8 @@ class _LocationSelectModalState extends ConsumerState<LocationSelectModal> {
   Widget build(BuildContext context) {
     final current = ref.watch(currentLocationProvider);
     final myLocations = ref.watch(myLocationsProvider);
-    final results = ref.watch(locationSearchResultsProvider);
+    final resultsAsync = ref.watch(locationSearchResultsProvider);
+    final results = resultsAsync.value ?? const <LocationItem>[];
     final bottom = MediaQuery.paddingOf(context).bottom;
     final height = MediaQuery.sizeOf(context).height * 0.88;
 
@@ -190,13 +196,20 @@ class _LocationSelectModalState extends ConsumerState<LocationSelectModal> {
                 if (_searchController.text.trim().isNotEmpty) ...[
                   Text('검색 결과', style: AppTypography.titleMedium),
                   const SizedBox(height: AppSpacing.xs),
-                  if (results.isEmpty)
+                  if (resultsAsync.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (resultsAsync.hasError || results.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: AppSpacing.lg,
                       ),
                       child: Text(
-                        '검색 결과가 없습니다.',
+                        resultsAsync.hasError
+                            ? '동네 검색에 실패했습니다. 네트워크를 확인해 주세요.'
+                            : '검색 결과가 없습니다.',
                         style: AppTypography.bodyMedium,
                       ),
                     )

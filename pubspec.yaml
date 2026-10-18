@@ -32,6 +32,7 @@ dependencies:
   flutter_svg: ^2.0.10
   cached_network_image: ^3.3.1
   flutter_riverpod: ^3.4.3
+  flutter_secure_storage: ^11.2.0
 
 dev_dependencies:
   flutter_test:
@@ -39,6 +40,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.4.8
   json_serializable: ^6.7.1
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true

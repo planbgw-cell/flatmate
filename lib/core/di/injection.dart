@@ -3,11 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/config/app_config.dart';
 import '../../data/local/local_storage.dart';
-import '../../features/auth/data/datasources/auth_remote_datasource.dart';
-import '../../features/auth/data/repositories/auth_repository_impl.dart';
+import '../../features/auth/data/repositories/dio_auth_repository.dart';
+import '../../features/auth/data/repositories/mock_auth_repository.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
-import '../../features/auth/domain/usecases/login_usecase.dart';
-import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/chat/data/repositories/dio_chat_repository.dart';
 import '../../features/chat/data/repositories/mock_chat_repository.dart';
 import '../../features/chat/domain/repositories/chat_repository.dart';
@@ -31,6 +29,7 @@ import '../../features/property/data/repositories/property_repository_impl.dart'
 import '../../features/property/domain/repositories/property_repository.dart';
 import '../../features/property/domain/usecases/get_properties_usecase.dart';
 import '../../features/property/presentation/bloc/property_bloc.dart';
+import '../auth/token_storage.dart';
 import '../network/api_client.dart';
 import '../network/dio_client.dart';
 import '../utils/location_service.dart';
@@ -47,18 +46,15 @@ Future<void> configureDependencies() async {
   sl.registerSingleton<SharedPreferences>(prefs);
   sl.registerLazySingleton<LocalStorage>(() => LocalStorage(sl()));
 
+  final tokens = TokenStorage();
+  await tokens.load();
+  sl.registerSingleton<TokenStorage>(tokens);
+
   sl.registerLazySingleton<ApiClient>(
-    () => ApiClient(storage: sl(), config: sl()),
+    () => ApiClient(tokens: sl(), config: sl()),
   );
   sl.registerLazySingleton<DioClient>(() => DioClient(sl()));
   sl.registerLazySingleton<LocationService>(LocationService.new);
-
-  sl.registerLazySingleton<AuthRemoteDataSource>(AuthRemoteDataSourceStub.new);
-  sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(sl()),
-  );
-  sl.registerFactory(() => LoginUseCase(sl()));
-  sl.registerFactory(() => AuthBloc(sl()));
 
   sl.registerLazySingleton<PropertyRemoteDataSource>(
     PropertyRemoteDataSourceStub.new,
@@ -79,12 +75,16 @@ Future<void> configureDependencies() async {
     );
     sl.registerLazySingleton<ChatRepository>(MockChatRepository.new);
     sl.registerLazySingleton<LocationRepository>(MockLocationRepository.new);
+    sl.registerLazySingleton<AuthRepository>(MockAuthRepository.new);
   } else {
     sl.registerLazySingleton<FeedRepository>(
       () => DioFeedRepository(sl()),
     );
     sl.registerLazySingleton<ChatRepository>(
-      () => DioChatRepository(sl()),
+      () => DioChatRepository(sl(), sl(), sl()),
+    );
+    sl.registerLazySingleton<AuthRepository>(
+      () => DioAuthRepository(sl()),
     );
     sl.registerLazySingleton<LocationRepository>(
       () => DioLocationRepository(sl()),

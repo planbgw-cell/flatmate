@@ -1,7 +1,18 @@
-import '../entities/user.dart';
+import '../models/auth_user.dart';
 
+/// Auth API contract (`/auth/signup`, `/auth/login`, `/auth/me`).
 abstract class AuthRepository {
-  Future<User> login({required String email, required String password});
-  Future<void> logout();
-  Future<User?> currentUser();
+  Future<AuthUser> signup({
+    required String email,
+    required String password,
+    required String nickname,
+  });
+
+  Future<AuthSession> login({
+    required String email,
+    required String password,
+  });
+
+  /// Current user for the stored JWT.
+  Future<AuthUser> getMe();
 }

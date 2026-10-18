@@ -143,6 +143,22 @@ List<LocationItem> buildMockLocations() {
       longitude: 127.0695,
     ),
     LocationItem(
+      id: 'loc-cheongnyong',
+      cityName: '서울',
+      districtName: '관악구',
+      dongName: '청룡동',
+      latitude: 37.4812,
+      longitude: 126.9527,
+    ),
+    LocationItem(
+      id: 'loc-bongcheon',
+      cityName: '서울',
+      districtName: '관악구',
+      dongName: '봉천동',
+      latitude: 37.4823,
+      longitude: 126.9418,
+    ),
+    LocationItem(
       id: 'loc-jeongja',
       cityName: '성남시',
       districtName: '분당구',

@@ -19,9 +19,15 @@ class AppConfig {
 
   bool get isDev => environment == AppEnvironment.development;
 
+  /// FastAPI dev server. Override: `--dart-define=API_BASE_URL=http://...`
+  static const devServerBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://121.133.47.161:8000/api/v1',
+  );
+
   static const development = AppConfig(
     environment: AppEnvironment.development,
-    apiBaseUrl: 'http://localhost:8000/api/v1',
+    apiBaseUrl: devServerBaseUrl,
     appName: 'Flatmate',
     useMockApi: true,
   );

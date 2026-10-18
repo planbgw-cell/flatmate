@@ -35,6 +35,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         child: AppBar(
           titleSpacing: 16.0,
           title: InkWell(
+            key: const ValueKey('feed-location-button'),
             onTap: onLocationTap,
             borderRadius: BorderRadius.circular(8),
             child: Row(

@@ -28,7 +28,8 @@ abstract class FeedRepository {
   Future<FeedItem> toggleFavorite(String id);
 
   /// Insert a newly created post (appears at top of subsequent fetches).
-  Future<FeedItem> createPost(FeedItem item);
+  /// [location] supplies the PostGIS point for geo queries.
+  Future<FeedItem> createPost(FeedItem item, {LocationItem? location});
 
   /// Convenience: category-filtered first page.
   Future<List<FeedItem>> fetchByCategory(

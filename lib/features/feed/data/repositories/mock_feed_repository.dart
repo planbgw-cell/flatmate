@@ -228,7 +228,7 @@ class MockFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<FeedItem> createPost(FeedItem item) async {
+  Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) async {
     await _delay();
     _ensureSeed();
     final created = item.copyWith(postedAt: DateTime.now());

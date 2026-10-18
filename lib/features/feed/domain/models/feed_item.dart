@@ -55,6 +55,7 @@ class FeedItem {
     this.imageUrls = const [],
     this.description = '',
     this.authorName = '이웃',
+    this.authorId,
     this.authorAvatarUrl,
     this.trustScore = 36.5,
     this.ctaLabel = '채팅하기',
@@ -77,6 +78,9 @@ class FeedItem {
   final List<String> imageUrls;
   final String description;
   final String authorName;
+
+  /// Server user id of the author (chat `peer_id`); null for mock posts.
+  final String? authorId;
   final String? authorAvatarUrl;
   final double trustScore;
   final String ctaLabel;
@@ -123,6 +127,7 @@ class FeedItem {
     List<String>? imageUrls,
     String? description,
     String? authorName,
+    String? authorId,
     String? authorAvatarUrl,
     double? trustScore,
     String? ctaLabel,
@@ -145,6 +150,7 @@ class FeedItem {
       imageUrls: imageUrls ?? this.imageUrls,
       description: description ?? this.description,
       authorName: authorName ?? this.authorName,
+      authorId: authorId ?? this.authorId,
       authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
       trustScore: trustScore ?? this.trustScore,
       ctaLabel: ctaLabel ?? this.ctaLabel,

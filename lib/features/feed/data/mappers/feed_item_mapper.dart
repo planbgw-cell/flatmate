@@ -1,95 +1,108 @@
+import '../../../location/domain/models/location_item.dart';
 import '../../domain/models/feed_item.dart';
 
-FeedItem feedItemFromJson(Map<String, dynamic> json) {
-  final categoryName = (json['category'] as String?) ?? 'community';
-  final category = FeedCategory.values.firstWhere(
-    (c) => c.name == categoryName,
-    orElse: () => FeedCategory.community,
-  );
+/// App category ↔ FastAPI `feed_type` enum.
+const _feedTypeByCategory = {
+  FeedCategory.housing: 'REAL_ESTATE',
+  FeedCategory.job: 'JOB',
+  FeedCategory.community: 'LOCAL_NEWS',
+  FeedCategory.market: 'GENERAL',
+};
 
-  final badgeNames = (json['badges'] as List?) ?? const [];
+/// `null` for `all` (no server-side filter).
+String? feedTypeForCategoryKey(String key) {
+  final category = FeedCategoryX.fromKey(key);
+  return _feedTypeByCategory[category];
+}
+
+FeedCategory categoryForFeedType(String? feedType) {
+  for (final entry in _feedTypeByCategory.entries) {
+    if (entry.value == feedType) return entry.key;
+  }
+  return FeedCategory.community;
+}
+
+/// `FeedOut` → [FeedItem]. UI-only fields travel in the free-form `extra` map.
+FeedItem feedItemFromJson(Map<String, dynamic> json) {
+  final extraRaw = json['extra'];
+  final extra = extraRaw is Map
+      ? Map<String, dynamic>.from(extraRaw)
+      : const <String, dynamic>{};
+
+  final images = (extra['image_urls'] as List?)
+          ?.map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList() ??
+      const <String>[];
+
+  final badgeNames = (extra['badges'] as List?) ?? const [];
   final badges = <FeedBadge>[
     for (final b in badgeNames)
       ...FeedBadge.values.where((e) => e.name == b.toString()),
   ];
 
-  final metaRaw = json['detail_meta'] ?? json['detailMeta'];
   final detailMeta = <String, String>{};
+  final metaRaw = extra['detail_meta'];
   if (metaRaw is Map) {
     metaRaw.forEach((key, value) {
       detailMeta[key.toString()] = value.toString();
     });
   }
 
-  final images = (json['image_urls'] as List?)?.map((e) => e.toString()).toList() ??
-      (json['imageUrls'] as List?)?.map((e) => e.toString()).toList() ??
-      const <String>[];
+  final address = json['address']?.toString() ?? '';
+  final neighborhood = extra['neighborhood']?.toString() ??
+      (address.isEmpty ? '' : address.split(' ').last);
+
+  final thumbnail = extra['thumbnail_url']?.toString() ??
+      (images.isNotEmpty ? images.first : '');
+
+  final postedAt = DateTime.tryParse(json['published_at']?.toString() ?? '') ??
+      DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+      DateTime.now();
 
   return FeedItem(
     id: json['id']?.toString() ?? '',
     title: json['title']?.toString() ?? '',
-    neighborhood: json['neighborhood']?.toString() ?? '',
-    postedAt: DateTime.tryParse(json['posted_at']?.toString() ?? '') ??
-        DateTime.tryParse(json['postedAt']?.toString() ?? '') ??
-        DateTime.now(),
-    priceOrCondition: json['price_or_condition']?.toString() ??
-        json['priceOrCondition']?.toString() ??
-        '',
-    thumbnailUrl: json['thumbnail_url']?.toString() ??
-        json['thumbnailUrl']?.toString() ??
-        '',
-    likeCount: (json['like_count'] as num?)?.toInt() ??
-        (json['likeCount'] as num?)?.toInt() ??
-        0,
-    chatCount: (json['chat_count'] as num?)?.toInt() ??
-        (json['chatCount'] as num?)?.toInt() ??
-        0,
-    category: category,
-    badges: badges,
-    isBumped: json['is_bumped'] as bool? ?? json['isBumped'] as bool? ?? false,
+    neighborhood: neighborhood,
+    postedAt: postedAt.toLocal(),
+    priceOrCondition: extra['price_or_condition']?.toString() ?? '',
+    thumbnailUrl: thumbnail,
     imageUrls: images,
-    description: json['description']?.toString() ?? '',
-    authorName: json['author_name']?.toString() ??
-        json['authorName']?.toString() ??
-        '이웃',
-    authorAvatarUrl: json['author_avatar_url']?.toString() ??
-        json['authorAvatarUrl']?.toString(),
-    trustScore: (json['trust_score'] as num?)?.toDouble() ??
-        (json['trustScore'] as num?)?.toDouble() ??
-        36.5,
-    ctaLabel: json['cta_label']?.toString() ??
-        json['ctaLabel']?.toString() ??
-        '채팅하기',
-    verificationCount: (json['verification_count'] as num?)?.toInt() ??
-        (json['verificationCount'] as num?)?.toInt() ??
-        3,
+    likeCount: (extra['like_count'] as num?)?.toInt() ?? 0,
+    chatCount: (extra['chat_count'] as num?)?.toInt() ?? 0,
+    category: categoryForFeedType(json['feed_type']?.toString()),
+    badges: badges,
+    isBumped: extra['is_bumped'] as bool? ?? false,
+    description: json['content']?.toString() ?? '',
+    authorName: extra['author_nickname']?.toString() ?? '이웃',
+    authorId: json['author_id']?.toString(),
+    ctaLabel: extra['cta_label']?.toString() ?? '채팅하기',
     detailMeta: detailMeta,
-    isFavorite:
-        json['is_favorite'] as bool? ?? json['isFavorite'] as bool? ?? false,
   );
 }
 
-Map<String, dynamic> feedItemToJson(FeedItem item) {
+/// [FeedItem] → `FeedCreate` body for `POST /feeds`.
+Map<String, dynamic> feedCreateToJson(FeedItem item, {LocationItem? location}) {
+  // Only remote URLs are shareable; local picks need an upload API first.
+  final remoteImages =
+      item.imageUrls.where((url) => url.startsWith('http')).toList();
   return {
-    'id': item.id,
+    'feed_type': _feedTypeByCategory[item.category] ?? 'GENERAL',
     'title': item.title,
-    'neighborhood': item.neighborhood,
-    'posted_at': item.postedAt.toIso8601String(),
-    'price_or_condition': item.priceOrCondition,
-    'thumbnail_url': item.thumbnailUrl,
-    'like_count': item.likeCount,
-    'chat_count': item.chatCount,
-    'category': item.category.name,
-    'badges': item.badges.map((b) => b.name).toList(),
-    'is_bumped': item.isBumped,
-    'image_urls': item.imageUrls,
-    'description': item.description,
-    'author_name': item.authorName,
-    'author_avatar_url': item.authorAvatarUrl,
-    'trust_score': item.trustScore,
-    'cta_label': item.ctaLabel,
-    'verification_count': item.verificationCount,
-    'detail_meta': item.detailMeta,
-    'is_favorite': item.isFavorite,
+    'content': item.description,
+    if (location != null) 'lat': location.latitude,
+    if (location != null) 'lng': location.longitude,
+    if (location != null) 'address': location.fullName,
+    'extra': {
+      'neighborhood': item.neighborhood,
+      'price_or_condition': item.priceOrCondition,
+      if (item.thumbnailUrl.startsWith('http'))
+        'thumbnail_url': item.thumbnailUrl,
+      'image_urls': remoteImages,
+      'badges': item.badges.map((b) => b.name).toList(),
+      'detail_meta': item.detailMeta,
+      'cta_label': item.ctaLabel,
+      'author_nickname': item.authorName,
+    },
   };
 }

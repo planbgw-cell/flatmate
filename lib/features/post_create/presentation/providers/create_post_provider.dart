@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../feed/domain/models/feed_item.dart';
 import '../../../feed/domain/repositories/feed_repository.dart';
 import '../../../feed/presentation/providers/feed_provider.dart';
@@ -88,7 +89,8 @@ class CreatePostNotifier extends AsyncNotifier<void> {
         badges: draft.badges,
         isBumped: false,
         description: body,
-        authorName: '나',
+        authorName: ref.read(authProvider).value?.nickname ?? '나',
+        authorId: ref.read(currentUserIdProvider),
         trustScore: 40.0,
         ctaLabel: draft.ctaLabel ??
             (draft.kind == CreatePostKind.job ? '지원하기' : '채팅하기'),
@@ -96,7 +98,7 @@ class CreatePostNotifier extends AsyncNotifier<void> {
         detailMeta: draft.detailMeta,
       );
 
-      final created = await _repo.createPost(item);
+      final created = await _repo.createPost(item, location: location);
       ref.invalidate(feedListProvider);
       state = const AsyncData(null);
       return created;

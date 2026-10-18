@@ -1,21 +1,28 @@
 import 'package:dio/dio.dart';
 
-import '../../data/local/local_storage.dart';
+import '../auth/token_storage.dart';
 
-/// Injects `Authorization: Bearer <token>` when a JWT is stored locally.
+/// Injects `Authorization: Bearer <token>` and drops the session on 401.
 class AuthInterceptor extends Interceptor {
-  AuthInterceptor(this._storage);
+  AuthInterceptor(this._tokens);
 
-  static const tokenKey = 'auth_token';
-
-  final LocalStorage _storage;
+  final TokenStorage _tokens;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final token = _storage.readString(tokenKey);
-    if (token != null && token.isNotEmpty) {
+    final token = _tokens.accessToken;
+    if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final sentToken = err.requestOptions.headers.containsKey('Authorization');
+    if (err.response?.statusCode == 401 && sentToken) {
+      _tokens.clear();
+    }
+    handler.next(err);
   }
 }

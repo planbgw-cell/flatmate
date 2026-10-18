@@ -68,5 +68,6 @@ class FeedRepositoryImpl implements FeedRepository {
   Future<FeedItem> toggleFavorite(String id) => _mock.toggleFavorite(id);
 
   @override
-  Future<FeedItem> createPost(FeedItem item) => _mock.createPost(item);
+  Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) =>
+      _mock.createPost(item, location: location);
 }

@@ -1,6 +1,7 @@
 abstract final class RouteNames {
   static const splash = '/splash';
   static const login = '/login';
+  static const signUp = '/signup';
   static const home = '/home';
   static const feed = '/feed';
   static const homeDetail = '/home/:id';
@@ -19,6 +20,9 @@ abstract final class RouteNames {
   static const chatRoom = '/chat/room/:roomId';
 
   static String chatRoomPath(String roomId) => '/chat/room/$roomId';
+  static String loginPath([String? from]) => from == null
+      ? login
+      : Uri(path: login, queryParameters: {'from': from}).toString();
   static String shareFeedPath(String id) => '/share/feed/$id';
   static String feedDetailPath(String id) => '/feed/detail/$id';
 }

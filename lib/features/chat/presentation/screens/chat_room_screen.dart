@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -25,12 +28,24 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
+  static const _pollInterval = Duration(seconds: 4);
+
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _sending = false;
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      ref.read(chatMessagesProvider(widget.roomId).notifier).poll();
+    });
+  }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -52,6 +67,15 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           curve: Curves.easeOut,
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is ApiException ? e.message : '메시지 전송에 실패했습니다.',
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -131,7 +155,12 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           Expanded(
             child: messagesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('$e')),
+              error: (e, _) => Center(
+                child: Text(
+                  e is ApiException ? e.message : '메시지를 불러오지 못했습니다.',
+                  style: AppTypography.bodyMedium,
+                ),
+              ),
               data: (messages) {
                 return ListView.builder(
                   controller: _scrollController,

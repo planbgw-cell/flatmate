@@ -2,7 +2,7 @@ import '../../../../core/network/api_client.dart';
 import '../../domain/models/location_item.dart';
 import '../../domain/repositories/location_repository.dart';
 
-/// FastAPI location repository (`/locations/...`).
+/// FastAPI location repository (`/locations`, `/locations/nearest`).
 class DioLocationRepository implements LocationRepository {
   DioLocationRepository(this._api);
 
@@ -10,9 +10,11 @@ class DioLocationRepository implements LocationRepository {
 
   @override
   Future<List<LocationItem>> search(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
     final response = await _api.get<dynamic>(
-      '/locations/search',
-      queryParameters: {'q': query},
+      '/locations',
+      queryParameters: {'q': q, 'limit': 30},
     );
     return _parseList(response.data);
   }
@@ -23,51 +25,31 @@ class DioLocationRepository implements LocationRepository {
     required double longitude,
   }) async {
     final response = await _api.get<dynamic>(
-      '/locations/reverse-geo',
-      queryParameters: {
-        'lat': latitude,
-        'lng': longitude,
-      },
+      '/locations/nearest',
+      queryParameters: {'lat': latitude, 'lng': longitude, 'limit': 1},
     );
-    final data = response.data;
-    if (data is Map<String, dynamic>) return locationItemFromJson(data);
-    if (data is Map) {
-      return locationItemFromJson(Map<String, dynamic>.from(data));
-    }
-    return null;
+    final list = _parseList(response.data);
+    return list.isEmpty ? null : list.first;
   }
 
   List<LocationItem> _parseList(dynamic data) {
-    final raw = switch (data) {
-      final List list => list,
-      final Map map => map['items'] ?? map['results'] ?? map['data'] ?? const [],
-      _ => const [],
-    };
-    if (raw is! List) return const [];
-    return raw
+    if (data is! List) return const [];
+    return data
         .whereType<Map>()
         .map((e) => locationItemFromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 }
 
+/// `LocationOut` → [LocationItem].
 LocationItem locationItemFromJson(Map<String, dynamic> json) {
+  final name = json['name']?.toString() ?? '';
   return LocationItem(
     id: json['id']?.toString() ?? '',
-    cityName: json['city_name']?.toString() ??
-        json['cityName']?.toString() ??
-        '',
-    districtName: json['district_name']?.toString() ??
-        json['districtName']?.toString() ??
-        '',
-    dongName: json['dong_name']?.toString() ??
-        json['dongName']?.toString() ??
-        '',
-    latitude: (json['latitude'] as num?)?.toDouble() ??
-        (json['lat'] as num?)?.toDouble() ??
-        0,
-    longitude: (json['longitude'] as num?)?.toDouble() ??
-        (json['lng'] as num?)?.toDouble() ??
-        0,
+    cityName: json['sido']?.toString() ?? '',
+    districtName: json['sigungu']?.toString() ?? '',
+    dongName: json['dong']?.toString() ?? name,
+    latitude: (json['lat'] as num?)?.toDouble() ?? 0,
+    longitude: (json['lng'] as num?)?.toDouble() ?? 0,
   );
 }

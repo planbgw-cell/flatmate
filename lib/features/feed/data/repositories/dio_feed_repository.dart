@@ -11,6 +11,12 @@ class DioFeedRepository implements FeedRepository {
 
   final ApiClient _api;
 
+  /// Last known server copy per id (detail/favorite fallbacks).
+  final Map<String, FeedItem> _cache = {};
+
+  /// Favorites are device-local until the server exposes a favorite API.
+  final Set<String> _favorites = {};
+
   @override
   Future<List<FeedItem>> fetchFeeds({
     required int page,
@@ -19,15 +25,16 @@ class DioFeedRepository implements FeedRepository {
     LocationItem? location,
     double radiusKm = 3,
   }) async {
+    final feedType = feedTypeForCategoryKey(category);
     final response = await _api.get<dynamic>(
       '/feeds',
       queryParameters: {
         'page': page,
-        'page_size': pageSize,
-        'category': category,
-        'radius': radiusKm,
+        'limit': pageSize,
+        'feed_type': ?feedType,
         if (location != null) 'lat': location.latitude,
         if (location != null) 'lng': location.longitude,
+        if (location != null) 'radius_m': (radiusKm * 1000).round(),
       },
     );
     return _parseList(response.data);
@@ -69,16 +76,11 @@ class DioFeedRepository implements FeedRepository {
 
   @override
   Future<FeedItem?> fetchById(String id) async {
+    // Server ids are integers; legacy/mock ids (e.g. `f-101`) cannot exist.
+    if (int.tryParse(id) == null) return null;
     try {
       final response = await _api.get<dynamic>('/feeds/$id');
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        return feedItemFromJson(data);
-      }
-      if (data is Map) {
-        return feedItemFromJson(Map<String, dynamic>.from(data));
-      }
-      return null;
+      return _remember(_asMap(response.data));
     } on ApiException catch (e) {
       if (e.statusCode == 404) return null;
       rethrow;
@@ -87,36 +89,56 @@ class DioFeedRepository implements FeedRepository {
 
   @override
   Future<FeedItem> toggleFavorite(String id) async {
-    final response = await _api.post<dynamic>('/feeds/$id/favorite');
-    final data = response.data;
-    if (data is Map<String, dynamic>) return feedItemFromJson(data);
-    if (data is Map) return feedItemFromJson(Map<String, dynamic>.from(data));
-    throw const ApiException(message: '좋아요 응답 형식이 올바르지 않습니다.');
+    final item = _cache[id] ?? await fetchById(id);
+    if (item == null) {
+      throw const ApiException(message: '게시글을 찾을 수 없습니다.', statusCode: 404);
+    }
+    final nowFavorite = !_favorites.contains(id);
+    nowFavorite ? _favorites.add(id) : _favorites.remove(id);
+    final updated = item.copyWith(
+      isFavorite: nowFavorite,
+      likeCount: (item.likeCount + (nowFavorite ? 1 : -1)).clamp(0, 1 << 31),
+    );
+    _cache[id] = updated;
+    return updated;
   }
 
   @override
-  Future<FeedItem> createPost(FeedItem item) async {
-    // Prefer JSON; Multipart can be added when local file picks are available.
+  Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) async {
     final response = await _api.post<dynamic>(
       '/feeds',
-      data: feedItemToJson(item),
+      data: feedCreateToJson(item, location: location),
     );
-    final data = response.data;
-    if (data is Map<String, dynamic>) return feedItemFromJson(data);
-    if (data is Map) return feedItemFromJson(Map<String, dynamic>.from(data));
-    throw const ApiException(message: '게시글 등록 응답 형식이 올바르지 않습니다.');
+    return _remember(_asMap(response.data));
+  }
+
+  FeedItem _remember(Map<String, dynamic> json) {
+    final parsed = feedItemFromJson(json);
+    final item = _favorites.contains(parsed.id)
+        ? parsed.copyWith(isFavorite: true, likeCount: parsed.likeCount + 1)
+        : parsed;
+    _cache[item.id] = item;
+    return item;
+  }
+
+  Map<String, dynamic> _asMap(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw const ApiException(message: '게시글 응답 형식이 올바르지 않습니다.');
   }
 
   List<FeedItem> _parseList(dynamic data) {
     final raw = switch (data) {
       final List list => list,
-      final Map map => map['items'] ?? map['results'] ?? map['data'] ?? const [],
+      final Map map => map['items'] ?? const [],
       _ => const [],
     };
     if (raw is! List) return const [];
+    // Geo queries come back distance-ordered; the feed UX is newest-first.
     return raw
         .whereType<Map>()
-        .map((e) => feedItemFromJson(Map<String, dynamic>.from(e)))
-        .toList();
+        .map((e) => _remember(Map<String, dynamic>.from(e)))
+        .toList()
+      ..sort((a, b) => b.postedAt.compareTo(a.postedAt));
   }
 }

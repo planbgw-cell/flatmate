@@ -1,14 +1,14 @@
 import 'package:dio/dio.dart';
 
 import '../../app/config/app_config.dart';
-import '../../data/local/local_storage.dart';
+import '../auth/token_storage.dart';
 import 'api_exception.dart';
 import 'auth_interceptor.dart';
 
 /// Dio singleton used by FastAPI repositories.
 class ApiClient {
   ApiClient({
-    required LocalStorage storage,
+    required TokenStorage tokens,
     AppConfig? config,
     Dio? dio,
   })  : _config = config ?? AppConfig.resolve(),
@@ -16,18 +16,18 @@ class ApiClient {
     _dio.options = BaseOptions(
       baseUrl: _config.apiBaseUrl,
       connectTimeout: const Duration(milliseconds: 5000),
-      receiveTimeout: const Duration(milliseconds: 5000),
+      receiveTimeout: const Duration(milliseconds: 10000),
       headers: const {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     );
 
-    _dio.interceptors.add(AuthInterceptor(storage));
+    _dio.interceptors.add(AuthInterceptor(tokens));
     if (_config.isDev) {
       _dio.interceptors.add(
         LogInterceptor(
-          requestHeader: true,
+          requestHeader: false,
           requestBody: true,
           responseBody: true,
           error: true,

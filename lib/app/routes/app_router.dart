@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth/token_storage.dart';
 import '../../core/di/injection.dart';
-import '../../features/auth/presentation/bloc/auth_bloc.dart';
-import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/sign_up_screen.dart';
 import '../../features/chat/domain/models/chat_room.dart';
 import '../../features/chat/presentation/screens/chat_list_screen.dart';
 import '../../features/chat/presentation/screens/chat_room_screen.dart';
@@ -23,10 +24,27 @@ import 'route_names.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// Screens that call JWT-protected APIs (`POST /feeds`, `/chats/*`).
+const _protectedPrefixes = [
+  '/post/create',
+  RouteNames.chat,
+  RouteNames.localLife,
+];
+
 GoRouter createAppRouter({String? initialLocation}) {
+  final tokens = sl<TokenStorage>();
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: initialLocation ?? RouteNames.splash,
+    refreshListenable: tokens,
+    redirect: (context, state) {
+      final path = state.uri.path;
+      final isProtected = _protectedPrefixes.any(path.startsWith);
+      if (isProtected && !tokens.hasValidToken) {
+        return RouteNames.loginPath(state.uri.toString());
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: RouteNames.splash,
@@ -40,9 +58,15 @@ GoRouter createAppRouter({String? initialLocation}) {
       GoRoute(
         path: RouteNames.login,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => BlocProvider(
-          create: (_) => sl<AuthBloc>(),
-          child: const LoginPage(),
+        builder: (context, state) => LoginScreen(
+          redirectTo: state.uri.queryParameters['from'],
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.signUp,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => SignUpScreen(
+          redirectTo: state.uri.queryParameters['from'],
         ),
       ),
       GoRoute(

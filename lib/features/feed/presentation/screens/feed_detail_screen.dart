@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/routes/route_names.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../domain/models/feed_item.dart';
 import '../providers/feed_provider.dart';
@@ -58,6 +60,10 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
   }
 
   Future<void> _onCta(FeedItem item) async {
+    if (!ref.read(tokenStorageProvider).hasValidToken) {
+      final loggedIn = await context.push<bool>(RouteNames.login);
+      if (loggedIn != true || !mounted) return;
+    }
     try {
       final roomId = await openChatForFeed(ref, item);
       if (!mounted) return;
@@ -74,7 +80,11 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('채팅방 연결에 실패했습니다. $e')),
+        SnackBar(
+          content: Text(
+            e is ApiException ? e.message : '채팅방 연결에 실패했습니다.',
+          ),
+        ),
       );
     }
   }

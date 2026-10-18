@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../feed/domain/models/feed_item.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
@@ -13,6 +14,8 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 class ChatRoomsNotifier extends AsyncNotifier<List<ChatRoom>> {
   @override
   Future<List<ChatRoom>> build() {
+    // Refetch per account (login / logout / token expiry).
+    ref.watch(currentUserIdProvider);
     return ref.read(chatRepositoryProvider).getChatRooms();
   }
 
@@ -57,6 +60,20 @@ class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
     final current = state.value ?? const <ChatMessage>[];
     state = AsyncData([...current, sent]);
     ref.invalidate(chatRoomsProvider);
+  }
+
+  /// Polling fetch for the peer's new messages (no WebSocket yet).
+  Future<void> poll() async {
+    final current = state.value;
+    if (current == null) return;
+    try {
+      final latest = await ref.read(chatRepositoryProvider).getMessages(roomId);
+      final changed = latest.length != current.length ||
+          (latest.isNotEmpty && latest.last.id != current.last.id);
+      if (changed) state = AsyncData(latest);
+    } catch (_) {
+      // Keep the current thread on transient polling failures.
+    }
   }
 }
 
