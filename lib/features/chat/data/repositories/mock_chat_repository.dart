@@ -4,6 +4,7 @@ import '../../../feed/domain/models/feed_item.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
 import '../../domain/repositories/chat_repository.dart';
+import '../../domain/repositories/chat_socket.dart';
 
 class MockChatRepository implements ChatRepository {
   MockChatRepository({Random? random}) : _random = random ?? Random() {
@@ -262,6 +263,9 @@ class MockChatRepository implements ChatRepository {
     ];
     return room;
   }
+
+  @override
+  ChatSocket? openSocket(String roomId) => null;
 
   @override
   Future<void> markRoomRead(String roomId) async {

@@ -1,5 +1,4 @@
-import 'dart:async';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/chat_room.dart';
+import '../../domain/repositories/chat_socket.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/chat_product_header.dart';
@@ -28,24 +28,12 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
-  static const _pollInterval = Duration(seconds: 4);
-
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _sending = false;
-  Timer? _pollTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _pollTimer = Timer.periodic(_pollInterval, (_) {
-      ref.read(chatMessagesProvider(widget.roomId).notifier).poll();
-    });
-  }
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -138,9 +126,16 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        title: Text(
-          room?.opponentName ?? '채팅',
-          style: AppTypography.header2,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(room?.opponentName ?? '채팅', style: AppTypography.header2),
+            _ConnectionLabel(
+              status: ref
+                  .read(chatMessagesProvider(widget.roomId).notifier)
+                  .socketStatus,
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -232,6 +227,40 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ConnectionLabel extends StatelessWidget {
+  const _ConnectionLabel({required this.status});
+
+  final ValueListenable<ChatSocketStatus>? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final listenable = status;
+    if (listenable == null) return const SizedBox.shrink();
+    return ValueListenableBuilder<ChatSocketStatus>(
+      valueListenable: listenable,
+      builder: (context, value, _) {
+        final (label, color) = switch (value) {
+          ChatSocketStatus.connected => ('실시간 연결됨', AppColors.statusSuccess),
+          ChatSocketStatus.connecting => ('연결 중…', AppColors.textHint),
+          ChatSocketStatus.disconnected => ('연결 끊김 · 재연결 대기', AppColors.textHint),
+        };
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 4),
+            Text(label, style: AppTypography.caption.copyWith(color: color)),
+          ],
+        );
+      },
     );
   }
 }

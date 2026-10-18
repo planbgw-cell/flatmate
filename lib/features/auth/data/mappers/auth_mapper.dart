@@ -12,11 +12,15 @@ AuthUser authUserFromJson(Map<String, dynamic> json) {
 
 AuthSession authSessionFromJson(Map<String, dynamic> json) {
   final user = json['user'];
+  final refreshSeconds = (json['refresh_expires_in'] as num?)?.toInt();
   return AuthSession(
     accessToken: json['access_token']?.toString() ?? '',
     expiresIn: Duration(
       seconds: (json['expires_in'] as num?)?.toInt() ?? 3600,
     ),
+    refreshToken: json['refresh_token']?.toString(),
+    refreshExpiresIn:
+        refreshSeconds == null ? null : Duration(seconds: refreshSeconds),
     user: authUserFromJson(
       user is Map ? Map<String, dynamic>.from(user) : const {},
     ),

@@ -1,8 +1,9 @@
 import '../../../feed/domain/models/feed_item.dart';
 import '../models/chat_message.dart';
 import '../models/chat_room.dart';
+import 'chat_socket.dart';
 
-/// Chat API contract — swap mock for WebSocket/FastAPI later.
+/// Chat API contract (REST history + optional realtime socket).
 abstract class ChatRepository {
   Future<List<ChatRoom>> getChatRooms();
 
@@ -16,4 +17,7 @@ abstract class ChatRepository {
   Future<ChatRoom> createOrGetRoom(FeedItem item);
 
   Future<void> markRoomRead(String roomId);
+
+  /// Realtime channel for [roomId]; `null` when the backend has none (mock).
+  ChatSocket? openSocket(String roomId);
 }

@@ -60,7 +60,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
   }
 
   Future<void> _onCta(FeedItem item) async {
-    if (!ref.read(tokenStorageProvider).hasValidToken) {
+    if (!ref.read(tokenStorageProvider).hasSession) {
       final loggedIn = await context.push<bool>(RouteNames.login);
       if (loggedIn != true || !mounted) return;
     }

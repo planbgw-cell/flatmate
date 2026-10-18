@@ -24,6 +24,7 @@ class DioFeedRepository implements FeedRepository {
     String category = 'all',
     LocationItem? location,
     double radiusKm = 3,
+    FeedSort sort = FeedSort.latest,
   }) async {
     final feedType = feedTypeForCategoryKey(category);
     final response = await _api.get<dynamic>(
@@ -35,6 +36,8 @@ class DioFeedRepository implements FeedRepository {
         if (location != null) 'lat': location.latitude,
         if (location != null) 'lng': location.longitude,
         if (location != null) 'radius_m': (radiusKm * 1000).round(),
+        // The server rejects `distance` without coordinates.
+        'sort': location == null ? FeedSort.latest.name : sort.name,
       },
     );
     return _parseList(response.data);
@@ -134,11 +137,9 @@ class DioFeedRepository implements FeedRepository {
       _ => const [],
     };
     if (raw is! List) return const [];
-    // Geo queries come back distance-ordered; the feed UX is newest-first.
     return raw
         .whereType<Map>()
         .map((e) => _remember(Map<String, dynamic>.from(e)))
-        .toList()
-      ..sort((a, b) => b.postedAt.compareTo(a.postedAt));
+        .toList();
   }
 }

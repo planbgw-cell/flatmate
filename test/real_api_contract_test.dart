@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flatmate_app/app/config/app_config.dart';
+import 'package:flatmate_app/core/auth/token_refresher.dart';
 import 'package:flatmate_app/core/auth/token_storage.dart';
 import 'package:flatmate_app/core/network/api_client.dart';
 import 'package:flatmate_app/core/network/api_exception.dart';
@@ -10,6 +11,7 @@ import 'package:flatmate_app/features/auth/data/repositories/dio_auth_repository
 import 'package:flatmate_app/features/chat/data/repositories/dio_chat_repository.dart';
 import 'package:flatmate_app/features/feed/data/repositories/dio_feed_repository.dart';
 import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
+import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/location/data/repositories/dio_location_repository.dart';
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -91,23 +93,54 @@ Map<String, dynamic> _feedOut({
   };
 }
 
+/// Refresher of the most recent [_client] (shares the fake adapter).
+late TokenRefresher _refresher;
+
 Future<(ApiClient, _FakeAdapter, TokenStorage)> _client(
   (int, Object?) Function(RequestOptions options) respond, {
   bool signedIn = true,
+  Duration accessExpiresIn = const Duration(hours: 1),
 }) async {
   final tokens = TokenStorage();
   if (signedIn) {
     await tokens.save(
       accessToken: 'jwt-abc',
+      refreshToken: 'refresh-xyz',
       userId: '7',
-      expiresIn: const Duration(hours: 1),
+      expiresIn: accessExpiresIn,
+      refreshExpiresIn: const Duration(days: 14),
     );
   }
   final adapter = _FakeAdapter(respond);
-  final api = ApiClient(tokens: tokens, config: _config);
+  _refresher = TokenRefresher(tokens: tokens, baseUrl: _config.apiBaseUrl)
+    ..dio.httpClientAdapter = adapter;
+  final api = ApiClient(tokens: tokens, refresher: _refresher, config: _config);
   api.dio.httpClientAdapter = adapter;
   return (api, adapter, tokens);
 }
+
+Map<String, dynamic> _tokenResponse(String access) => {
+      'access_token': access,
+      'refresh_token': 'refresh-xyz',
+      'token_type': 'bearer',
+      'expires_in': 3600,
+      'refresh_expires_in': 1209600,
+      'user': {
+        'id': 7,
+        'email': 'qa@example.com',
+        'nickname': 'QA',
+        'is_active': true,
+        'created_at': '2026-10-18T03:00:00Z',
+      },
+    };
+
+final _me = <String, dynamic>{
+  'id': 7,
+  'email': 'qa@example.com',
+  'nickname': 'QA',
+  'is_active': true,
+  'created_at': '2026-10-18T03:00:00Z',
+};
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
@@ -157,8 +190,10 @@ void main() {
       expect(query['radius_m'], 3000);
       expect(query['limit'], 10);
 
-      expect(items.map((e) => e.title), ['새 글', '오래된 글']);
-      final item = items.last;
+      expect(query['sort'], 'latest');
+      // Server owns ordering now (`sort=`), so the client keeps it as-is.
+      expect(items.map((e) => e.title), ['오래된 글', '새 글']);
+      final item = items.first;
       expect(item.id, '1');
       expect(item.category, FeedCategory.housing);
       expect(item.authorId, '1');
@@ -287,12 +322,67 @@ void main() {
       );
     });
 
-    test('401 on an authenticated call clears the stored session', () async {
-      final (api, _, tokens) =
-          await _client((_) => (401, {'detail': 'Could not validate credentials'}));
-      expect(tokens.hasValidToken, isTrue);
-      await expectLater(DioAuthRepository(api).getMe(), throwsA(isA<ApiException>()));
-      expect(tokens.hasValidToken, isFalse);
+    test('401 → POST /auth/refresh once → replays requests with new token',
+        () async {
+      final (api, adapter, tokens) = await _client((o) {
+        if (o.path == '/auth/refresh') return (200, _tokenResponse('jwt-new'));
+        final auth = o.headers['Authorization'];
+        return auth == 'Bearer jwt-new'
+            ? (200, _me)
+            : (401, {'detail': 'Could not validate credentials'});
+      });
+      final repo = DioAuthRepository(api);
+
+      final results = await Future.wait([repo.getMe(), repo.getMe()]);
+
+      expect(results.map((u) => u.id), ['7', '7']);
+      final refreshCalls =
+          adapter.requests.where((r) => r.path == '/auth/refresh').toList();
+      expect(refreshCalls, hasLength(1));
+      expect(refreshCalls.single.data, {'refresh_token': 'refresh-xyz'});
+      expect(refreshCalls.single.headers.containsKey('Authorization'), isFalse);
+      expect(tokens.accessToken, 'jwt-new');
+      expect(tokens.hasSession, isTrue);
+    });
+
+    test('locally expired access token is refreshed before the request',
+        () async {
+      final (api, adapter, tokens) = await _client(
+        (o) => o.path == '/auth/refresh'
+            ? (200, _tokenResponse('jwt-new'))
+            : (200, _me),
+        accessExpiresIn: Duration.zero,
+      );
+      await DioAuthRepository(api).getMe();
+      expect(adapter.requests.map((r) => r.path), ['/auth/refresh', '/auth/me']);
+      expect(adapter.requests.last.headers['Authorization'], 'Bearer jwt-new');
+      expect(tokens.isAccessTokenFresh, isTrue);
+    });
+
+    test('rejected refresh token clears the session and flags expiry',
+        () async {
+      final (api, _, tokens) = await _client(
+        (o) => o.path == '/auth/refresh'
+            ? (401, {'detail': 'Invalid or expired refresh token'})
+            : (401, {'detail': 'Could not validate credentials'}),
+      );
+      await expectLater(
+        DioAuthRepository(api).getMe(),
+        throwsA(isA<ApiException>()),
+      );
+      expect(tokens.hasSession, isFalse);
+      expect(tokens.sessionExpired, isTrue);
+    });
+
+    test('login stores both tokens', () async {
+      final (api, _, _) = await _client(
+        (_) => (200, _tokenResponse('jwt-login')),
+        signedIn: false,
+      );
+      final session = await DioAuthRepository(api)
+          .login(email: 'qa@example.com', password: 'Flatmate123!');
+      expect(session.refreshToken, 'refresh-xyz');
+      expect(session.refreshExpiresIn, const Duration(days: 14));
     });
   });
 
@@ -308,7 +398,12 @@ void main() {
               'feed_id': 1,
               'user_a_id': 1,
               'user_b_id': 7,
-              'last_message_at': null,
+              'peer_id': 1,
+              'peer_nickname': '판매자닉',
+              'peer_profile_image': null,
+              'last_message': '네 가능합니다',
+              'last_message_at': '2026-10-18T03:02:00Z',
+              'unread_count': 2,
               'created_at': '2026-10-18T03:00:00Z',
             },
           );
@@ -322,6 +417,8 @@ void main() {
               'sender_id': 7,
               'content': '안녕하세요',
               'created_at': '2026-10-18T03:01:00Z',
+              'read_at': '2026-10-18T03:01:30Z',
+              'is_read': true,
             },
             {
               'id': 12,
@@ -329,12 +426,14 @@ void main() {
               'sender_id': 1,
               'content': '네 가능합니다',
               'created_at': '2026-10-18T03:02:00Z',
+              'read_at': null,
+              'is_read': false,
             },
           ],
         );
       });
       final feeds = DioFeedRepository(api);
-      final repo = DioChatRepository(api, tokens, feeds);
+      final repo = DioChatRepository(api, tokens, _refresher, feeds);
       final feed = FeedItem(
         id: '1',
         title: '정자동 원룸',
@@ -352,16 +451,18 @@ void main() {
       );
 
       final room = await repo.createOrGetRoom(feed);
-      final create = adapter.requests.first;
+      final create = adapter.requests.single;
       expect(create.data, {'peer_id': 1, 'feed_id': 1});
       expect(create.headers['Authorization'], 'Bearer jwt-abc');
       expect(room.id, '5');
-      expect(room.opponentName, '판매자');
+      expect(room.opponentName, '판매자닉');
+      expect(room.unreadCount, 2);
       expect(room.feedTitle, '정자동 원룸');
       expect(room.lastMessage, '네 가능합니다');
 
       final messages = await repo.getMessages('5');
       expect(messages.map((m) => m.isMine), [true, false]);
+      expect(messages.map((m) => m.isRead), [true, false]);
       expect(messages.first.message, '안녕하세요');
 
       await expectLater(
@@ -383,12 +484,65 @@ void main() {
           },
         ),
       );
-      final repo = DioChatRepository(api, tokens, DioFeedRepository(api));
+      final repo =
+          DioChatRepository(api, tokens, _refresher, DioFeedRepository(api));
       final sent = await repo.sendMessage('5', '내일 볼 수 있을까요?');
       expect(adapter.requests.single.path, '/chats/rooms/5/messages');
       expect(adapter.requests.single.data, {'content': '내일 볼 수 있을까요?'});
       expect(sent.isMine, isTrue);
+
+      await repo.markRoomRead('5');
+      expect(adapter.requests.last.path, '/chats/rooms/5/read');
+      expect(adapter.requests.last.method, 'POST');
     });
+
+    test('room list binds peer/unread/last message with no per-room calls',
+        () async {
+      final (api, adapter, tokens) = await _client((o) {
+        if (o.path == '/chats/rooms') {
+          return (
+            200,
+            [
+              for (final id in [1, 2])
+                {
+                  'id': id,
+                  'feed_id': null,
+                  'user_a_id': 7,
+                  'user_b_id': 10 + id,
+                  'peer_id': 10 + id,
+                  'peer_nickname': '이웃$id',
+                  'last_message': '메시지$id',
+                  'last_message_at': '2026-10-18T0$id:00:00Z',
+                  'unread_count': id,
+                  'created_at': '2026-10-18T00:00:00Z',
+                },
+            ],
+          );
+        }
+        return (404, null);
+      });
+      final rooms = await DioChatRepository(
+        api,
+        tokens,
+        _refresher,
+        DioFeedRepository(api),
+      ).getChatRooms();
+      expect(adapter.requests, hasLength(1));
+      expect(rooms.map((r) => r.opponentName), ['이웃2', '이웃1']);
+      expect(rooms.map((r) => r.unreadCount), [2, 1]);
+      expect(rooms.first.lastMessage, '메시지2');
+    });
+  });
+
+  test('GET /feeds forwards sort (distance needs coordinates)', () async {
+    final (api, adapter, _) = await _client(
+      (_) => (200, {'total': 0, 'page': 1, 'limit': 10, 'items': []}),
+    );
+    final repo = DioFeedRepository(api);
+    await repo.fetchFeeds(page: 1, location: _jeongja, sort: FeedSort.distance);
+    await repo.fetchFeeds(page: 1, sort: FeedSort.distance);
+    expect(adapter.requests[0].queryParameters['sort'], 'distance');
+    expect(adapter.requests[1].queryParameters['sort'], 'latest');
   });
 
   test('locations map LocationOut and use /locations/nearest', () async {

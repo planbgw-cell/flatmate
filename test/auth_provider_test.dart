@@ -31,7 +31,7 @@ void main() {
         );
 
     expect(user.nickname, '새이웃');
-    expect(tokens.hasValidToken, isTrue);
+    expect(tokens.hasSession, isTrue);
     expect(container.read(currentUserIdProvider), user.id);
 
     final reloaded = TokenStorage();

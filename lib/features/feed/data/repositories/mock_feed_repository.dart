@@ -140,16 +140,24 @@ class MockFeedRepository implements FeedRepository {
     String category = 'all',
     LocationItem? location,
     double radiusKm = 3,
+    FeedSort sort = FeedSort.latest,
   }) async {
     await _delay();
     if (page < 1) return const [];
-    return _paged(
+    final items = _paged(
       page: page,
       pageSize: pageSize,
       category: category,
       location: location,
       radiusKm: radiusKm,
     );
+    if (sort != FeedSort.distance || location == null) return items;
+    double distance(FeedItem item) {
+      final anchor = locationForNeighborhood(item.neighborhood);
+      return anchor == null ? double.infinity : location.distanceKmTo(anchor);
+    }
+
+    return [...items]..sort((a, b) => distance(a).compareTo(distance(b)));
   }
 
   @override

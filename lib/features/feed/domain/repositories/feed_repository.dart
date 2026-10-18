@@ -1,6 +1,15 @@
 import '../../../location/domain/models/location_item.dart';
 import '../models/feed_item.dart';
 
+/// Feed ordering (`GET /feeds?sort=`). `distance` needs a location.
+enum FeedSort {
+  latest('최신순'),
+  distance('가까운순');
+
+  const FeedSort(this.label);
+  final String label;
+}
+
 /// Feed API contract — swap [MockFeedRepository] for a Dio/FastAPI impl later.
 abstract class FeedRepository {
   /// Paginated feed with category + geo filter.
@@ -19,6 +28,7 @@ abstract class FeedRepository {
     String category = 'all',
     LocationItem? location,
     double radiusKm = 3,
+    FeedSort sort = FeedSort.latest,
   });
 
   /// Single post detail by id.

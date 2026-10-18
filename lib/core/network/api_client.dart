@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../app/config/app_config.dart';
+import '../auth/token_refresher.dart';
 import '../auth/token_storage.dart';
 import 'api_exception.dart';
 import 'auth_interceptor.dart';
@@ -9,10 +10,13 @@ import 'auth_interceptor.dart';
 class ApiClient {
   ApiClient({
     required TokenStorage tokens,
+    TokenRefresher? refresher,
     AppConfig? config,
     Dio? dio,
   })  : _config = config ?? AppConfig.resolve(),
         _dio = dio ?? Dio() {
+    final tokenRefresher = refresher ??
+        TokenRefresher(tokens: tokens, baseUrl: _config.apiBaseUrl);
     _dio.options = BaseOptions(
       baseUrl: _config.apiBaseUrl,
       connectTimeout: const Duration(milliseconds: 5000),
@@ -23,7 +27,9 @@ class ApiClient {
       },
     );
 
-    _dio.interceptors.add(AuthInterceptor(tokens));
+    _dio.interceptors.add(
+      AuthInterceptor(tokens: tokens, refresher: tokenRefresher, dio: _dio),
+    );
     if (_config.isDev) {
       _dio.interceptors.add(
         LogInterceptor(

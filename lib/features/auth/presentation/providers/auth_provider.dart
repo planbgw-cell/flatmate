@@ -23,7 +23,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
   Future<AuthUser?> build() async {
     final tokens = _tokens;
     void onSessionChanged() {
-      if (!tokens.hasValidToken && state.value != null) {
+      if (!tokens.hasSession && state.value != null) {
         state = const AsyncData(null);
       }
     }
@@ -31,7 +31,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     tokens.addListener(onSessionChanged);
     ref.onDispose(() => tokens.removeListener(onSessionChanged));
 
-    if (!tokens.hasValidToken) return null;
+    if (!tokens.hasSession) return null;
     try {
       return await _repo.getMe();
     } on ApiException catch (e) {
@@ -50,8 +50,10 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     final session = await _repo.login(email: email.trim(), password: password);
     await _tokens.save(
       accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
       userId: session.user.id,
       expiresIn: session.expiresIn,
+      refreshExpiresIn: session.refreshExpiresIn,
     );
     state = AsyncData(session.user);
     return session.user;

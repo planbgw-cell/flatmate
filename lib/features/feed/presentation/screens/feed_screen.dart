@@ -12,6 +12,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 import '../../../location/presentation/widgets/location_select_modal.dart';
 import '../../domain/models/feed_item.dart';
+import '../../domain/repositories/feed_repository.dart';
 import '../providers/feed_provider.dart';
 import '../widgets/feed_card_item.dart';
 import '../widgets/feed_filter_bar.dart';
@@ -92,6 +93,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 ref.read(selectedCategoryProvider.notifier).state = value.name;
               },
             ),
+            _FeedSortBar(
+              selected: ref.watch(feedSortProvider),
+              onSelected: (sort) =>
+                  ref.read(feedSortProvider.notifier).state = sort,
+            ),
             const Divider(height: 1),
             Expanded(
               child: feedAsync.when(
@@ -160,6 +166,50 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FeedSortBar extends StatelessWidget {
+  const _FeedSortBar({required this.selected, required this.onSelected});
+
+  final FeedSort selected;
+  final ValueChanged<FeedSort> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.xs,
+        AppSpacing.xxs,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          for (final sort in FeedSort.values)
+            TextButton(
+              key: ValueKey('feed-sort-${sort.name}'),
+              onPressed: sort == selected ? null : () => onSelected(sort),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                minimumSize: const Size(0, 32),
+              ),
+              child: Text(
+                sort.label,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: sort == selected
+                      ? AppColors.textPrimary
+                      : AppColors.textHint,
+                  fontWeight:
+                      sort == selected ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

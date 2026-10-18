@@ -39,8 +39,11 @@ GoRouter createAppRouter({String? initialLocation}) {
     refreshListenable: tokens,
     redirect: (context, state) {
       final path = state.uri.path;
+      const authPaths = [RouteNames.login, RouteNames.signUp, RouteNames.splash];
+      if (authPaths.contains(path)) return null;
       final isProtected = _protectedPrefixes.any(path.startsWith);
-      if (isProtected && !tokens.hasValidToken) {
+      // Refresh token rejected → back to login from anywhere.
+      if (tokens.sessionExpired || (isProtected && !tokens.hasSession)) {
         return RouteNames.loginPath(state.uri.toString());
       }
       return null;

@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen>
       _warmUp(),
     ]);
     if (!mounted) return;
-    final signedIn = sl<TokenStorage>().hasValidToken;
+    final signedIn = sl<TokenStorage>().hasSession;
     // Real API: first launch starts at login (sign-up → JWT); mock stays open.
     final mustLogin = !signedIn && !sl<AppConfig>().useMockApi;
     context.go(mustLogin ? RouteNames.login : RouteNames.home);

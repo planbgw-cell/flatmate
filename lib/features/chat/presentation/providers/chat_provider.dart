@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/injection.dart';
@@ -6,6 +9,7 @@ import '../../../feed/domain/models/feed_item.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
 import '../../domain/repositories/chat_repository.dart';
+import '../../domain/repositories/chat_socket.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   return sl<ChatRepository>();
@@ -37,48 +41,106 @@ final chatRoomsProvider =
   ChatRoomsNotifier.new,
 );
 
+/// Message thread for one room. Lives while the room screen is open: the
+/// WebSocket connects on first watch and disconnects on dispose.
 class ChatMessagesNotifier extends AsyncNotifier<List<ChatMessage>> {
   ChatMessagesNotifier(this.roomId);
 
   final String roomId;
 
+  ChatSocket? _socket;
+  final List<ChatMessage> _pending = [];
+
+  /// `null` when the repository has no realtime channel (mock mode).
+  ValueListenable<ChatSocketStatus>? get socketStatus => _socket?.status;
+
+  ChatRepository get _repo => ref.read(chatRepositoryProvider);
+
   @override
   Future<List<ChatMessage>> build() async {
-    final repo = ref.read(chatRepositoryProvider);
-    await repo.markRoomRead(roomId);
-    // Refresh room list unread badges after marking read.
+    final socket = _repo.openSocket(roomId);
+    _socket = socket;
+    if (socket != null) {
+      final subscription = socket.events.listen(_onEvent);
+      void onStatus() {
+        if (socket.status.value == ChatSocketStatus.connected) {
+          socket.sendRead();
+        }
+      }
+
+      socket.status.addListener(onStatus);
+      ref.onDispose(() {
+        subscription.cancel();
+        socket.status.removeListener(onStatus);
+        socket.dispose();
+      });
+      // Outside build: status changes notify listeners synchronously.
+      unawaited(Future.microtask(socket.connect));
+    } else {
+      await _repo.markRoomRead(roomId);
+    }
+
+    final history = await _repo.getMessages(roomId);
     ref.invalidate(chatRoomsProvider);
-    return repo.getMessages(roomId);
+    final merged = _pending.fold(history, _upsert);
+    _pending.clear();
+    return merged;
   }
 
   Future<void> send(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
 
-    final sent =
-        await ref.read(chatRepositoryProvider).sendMessage(roomId, trimmed);
-    final current = state.value ?? const <ChatMessage>[];
-    state = AsyncData([...current, sent]);
-    ref.invalidate(chatRoomsProvider);
+    // Socket path: the server echoes the stored message back to us.
+    if (_socket?.sendMessage(trimmed) ?? false) return;
+
+    final sent = await _repo.sendMessage(roomId, trimmed);
+    _apply(sent);
   }
 
-  /// Polling fetch for the peer's new messages (no WebSocket yet).
-  Future<void> poll() async {
-    final current = state.value;
-    if (current == null) return;
-    try {
-      final latest = await ref.read(chatRepositoryProvider).getMessages(roomId);
-      final changed = latest.length != current.length ||
-          (latest.isNotEmpty && latest.last.id != current.last.id);
-      if (changed) state = AsyncData(latest);
-    } catch (_) {
-      // Keep the current thread on transient polling failures.
+  void _onEvent(ChatSocketEvent event) {
+    switch (event) {
+      case ChatSocketMessage(:final message):
+        _apply(message);
+        if (!message.isMine) _socket?.sendRead();
+        ref.invalidate(chatRoomsProvider);
+      case ChatSocketRead(:final readerId, :final readAt):
+        final me = ref.read(currentUserIdProvider);
+        if (readerId == me) {
+          ref.invalidate(chatRoomsProvider);
+          return;
+        }
+        final current = state.value;
+        if (current == null) return;
+        state = AsyncData([
+          for (final m in current)
+            m.isMine && !m.isRead && !m.createdAt.isAfter(readAt)
+                ? m.copyWith(isRead: true)
+                : m,
+        ]);
+      case ChatSocketError():
+        break;
     }
+  }
+
+  void _apply(ChatMessage message) {
+    final current = state.value;
+    if (current == null) {
+      _pending.add(message);
+      return;
+    }
+    state = AsyncData(_upsert(current, message));
+  }
+
+  static List<ChatMessage> _upsert(List<ChatMessage> list, ChatMessage m) {
+    final index = list.indexWhere((e) => e.id == m.id);
+    if (index >= 0) return [...list]..[index] = m;
+    return [...list, m]..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 }
 
-final chatMessagesProvider =
-    AsyncNotifierProvider.family<ChatMessagesNotifier, List<ChatMessage>, String>(
+final chatMessagesProvider = AsyncNotifierProvider.autoDispose
+    .family<ChatMessagesNotifier, List<ChatMessage>, String>(
   ChatMessagesNotifier.new,
 );
 

@@ -16,6 +16,9 @@ final selectedCategoryProvider = StateProvider<String>((ref) {
   return FeedCategory.all.name;
 });
 
+/// Daangn-style default: newest first within the selected radius.
+final feedSortProvider = StateProvider<FeedSort>((ref) => FeedSort.latest);
+
 class FeedListState {
   const FeedListState({
     required this.items,
@@ -54,12 +57,14 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
     final category = ref.watch(selectedCategoryProvider);
     final location = ref.watch(currentLocationProvider);
     final radiusKm = ref.watch(locationRadiusProvider);
+    final sort = ref.watch(feedSortProvider);
     final items = await _repo.fetchFeeds(
       page: 1,
       pageSize: _pageSize,
       category: category,
       location: location,
       radiusKm: radiusKm,
+      sort: sort,
     );
     return FeedListState(
       items: items,
@@ -72,6 +77,7 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
     final category = ref.read(selectedCategoryProvider);
     final location = ref.read(currentLocationProvider);
     final radiusKm = ref.read(locationRadiusProvider);
+    final sort = ref.read(feedSortProvider);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final items = await _repo.fetchFeeds(
@@ -80,6 +86,7 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
         category: category,
         location: location,
         radiusKm: radiusKm,
+        sort: sort,
       );
       return FeedListState(
         items: items,
@@ -105,6 +112,7 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
         category: category,
         location: location,
         radiusKm: radiusKm,
+        sort: ref.read(feedSortProvider),
       );
       state = AsyncData(
         FeedListState(

@@ -28,6 +28,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _submitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    final tokens = ref.read(tokenStorageProvider);
+    if (tokens.sessionExpired) {
+      tokens.acknowledgeSessionExpired();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 만료되었어요. 다시 로그인해 주세요.')),
+        );
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();

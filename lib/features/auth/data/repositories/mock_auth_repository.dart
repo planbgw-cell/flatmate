@@ -49,6 +49,8 @@ class MockAuthRepository implements AuthRepository {
     return AuthSession(
       accessToken: 'mock-token-${DateTime.now().millisecondsSinceEpoch}',
       expiresIn: const Duration(hours: 1),
+      refreshToken: 'mock-refresh-${DateTime.now().millisecondsSinceEpoch}',
+      refreshExpiresIn: const Duration(days: 14),
       user: user,
     );
   }

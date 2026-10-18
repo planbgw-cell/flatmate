@@ -34,6 +34,7 @@ class FeedRepositoryImpl implements FeedRepository {
     String category = 'all',
     LocationItem? location,
     double radiusKm = 3,
+    FeedSort sort = FeedSort.latest,
   }) {
     return _mock.fetchFeeds(
       page: page,
@@ -41,6 +42,7 @@ class FeedRepositoryImpl implements FeedRepository {
       category: category,
       location: location,
       radiusKm: radiusKm,
+      sort: sort,
     );
   }
 

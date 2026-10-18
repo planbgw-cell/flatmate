@@ -29,6 +29,7 @@ import '../../features/property/data/repositories/property_repository_impl.dart'
 import '../../features/property/domain/repositories/property_repository.dart';
 import '../../features/property/domain/usecases/get_properties_usecase.dart';
 import '../../features/property/presentation/bloc/property_bloc.dart';
+import '../auth/token_refresher.dart';
 import '../auth/token_storage.dart';
 import '../network/api_client.dart';
 import '../network/dio_client.dart';
@@ -50,8 +51,12 @@ Future<void> configureDependencies() async {
   await tokens.load();
   sl.registerSingleton<TokenStorage>(tokens);
 
+  // Shared so REST and WebSocket refreshes collapse into one request.
+  sl.registerLazySingleton<TokenRefresher>(
+    () => TokenRefresher(tokens: sl(), baseUrl: config.apiBaseUrl),
+  );
   sl.registerLazySingleton<ApiClient>(
-    () => ApiClient(tokens: sl(), config: sl()),
+    () => ApiClient(tokens: sl(), refresher: sl(), config: sl()),
   );
   sl.registerLazySingleton<DioClient>(() => DioClient(sl()));
   sl.registerLazySingleton<LocationService>(LocationService.new);
@@ -81,7 +86,7 @@ Future<void> configureDependencies() async {
       () => DioFeedRepository(sl()),
     );
     sl.registerLazySingleton<ChatRepository>(
-      () => DioChatRepository(sl(), sl(), sl()),
+      () => DioChatRepository(sl(), sl(), sl(), sl()),
     );
     sl.registerLazySingleton<AuthRepository>(
       () => DioAuthRepository(sl()),

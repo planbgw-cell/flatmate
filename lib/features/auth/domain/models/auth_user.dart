@@ -20,9 +20,15 @@ class AuthSession {
     required this.accessToken,
     required this.expiresIn,
     required this.user,
+    this.refreshToken,
+    this.refreshExpiresIn,
   });
 
   final String accessToken;
   final Duration expiresIn;
   final AuthUser user;
+
+  /// Long-lived token for `POST /auth/refresh` (14 days on the dev server).
+  final String? refreshToken;
+  final Duration? refreshExpiresIn;
 }

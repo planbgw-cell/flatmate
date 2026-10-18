@@ -63,7 +63,21 @@ class ChatBubble extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            time,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (message.isRead)
+                  Text(
+                    '읽음',
+                    key: ValueKey('read-${message.id}'),
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                time,
+              ],
+            ),
             const SizedBox(width: 6),
             bubble,
           ],
