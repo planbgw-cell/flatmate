@@ -15,11 +15,17 @@ class DioAuthRepository implements AuthRepository {
     required String email,
     required String password,
     required String nickname,
+    int? locationId,
   }) async {
     try {
       final response = await _api.post<dynamic>(
         '/auth/signup',
-        data: {'email': email, 'password': password, 'nickname': nickname},
+        data: {
+          'email': email,
+          'password': password,
+          'nickname': nickname,
+          'location_id': ?locationId,
+        },
       );
       return authUserFromJson(_asMap(response.data));
     } on ApiException catch (e) {
@@ -59,6 +65,15 @@ class DioAuthRepository implements AuthRepository {
   @override
   Future<AuthUser> getMe() async {
     final response = await _api.get<dynamic>('/auth/me');
+    return authUserFromJson(_asMap(response.data));
+  }
+
+  @override
+  Future<AuthUser> updateLocation(int locationId) async {
+    final response = await _api.patch<dynamic>(
+      '/auth/location',
+      data: {'location_id': locationId},
+    );
     return authUserFromJson(_asMap(response.data));
   }
 

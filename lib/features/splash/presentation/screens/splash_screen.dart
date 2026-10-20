@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,7 +9,7 @@ import '../../../../core/auth/token_storage.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/utils/location_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Brand splash — warm-up then enter main feed shell.
 class SplashScreen extends StatefulWidget {
@@ -39,25 +40,22 @@ class _SplashScreenState extends State<SplashScreen>
     _bootstrap();
   }
 
+  /// GPS permission is requested only when the user asks for "내 위치".
+  /// Waits for the session restore so the feed opens on the 대표 동네.
   Future<void> _bootstrap() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     await Future.wait([
       Future<void>.delayed(const Duration(milliseconds: 1700)),
-      _warmUp(),
+      container
+          .read(authProvider.future)
+          .timeout(const Duration(seconds: 5))
+          .then<void>((_) {}, onError: (Object _) {}),
     ]);
     if (!mounted) return;
     final signedIn = sl<TokenStorage>().hasSession;
     // Real API: first launch starts at login (sign-up → JWT); mock stays open.
     final mustLogin = !signedIn && !sl<AppConfig>().useMockApi;
     context.go(mustLogin ? RouteNames.login : RouteNames.home);
-  }
-
-  Future<void> _warmUp() async {
-    // Soft location preload (ignore denial / timeout).
-    try {
-      await sl<LocationService>()
-          .currentPosition()
-          .timeout(const Duration(milliseconds: 900));
-    } catch (_) {}
   }
 
   @override

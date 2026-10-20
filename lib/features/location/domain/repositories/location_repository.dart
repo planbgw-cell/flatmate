@@ -3,8 +3,6 @@ import '../models/location_item.dart';
 abstract class LocationRepository {
   Future<List<LocationItem>> search(String query);
 
-  Future<LocationItem?> reverseGeo({
-    required double latitude,
-    required double longitude,
-  });
+  /// GPS / map-center coordinate → administrative dong.
+  Future<LocationItem?> getReverseGeo(double lat, double lng);
 }

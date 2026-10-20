@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../../core/utils/location_service.dart';
+import '../../data/datasources/location_service.dart';
 import '../../domain/models/location_item.dart';
 import '../../domain/repositories/location_repository.dart';
 
@@ -65,6 +65,16 @@ class MyLocationsNotifier extends Notifier<List<LocationItem>> {
     if (!state.any((e) => e.id == location.id)) return;
     ref.read(currentLocationProvider.notifier).state = location;
   }
+
+  /// Server 대표 동네 → first slot + active. Drops local placeholder dongs
+  /// (e.g. the 신촌동 default) that have no server id.
+  void bindPrimary(LocationItem primary) {
+    final others = state
+        .where((e) => e.id != primary.id && int.tryParse(e.id) != null)
+        .take(maxSlots - 1);
+    state = [primary, ...others];
+    ref.read(currentLocationProvider.notifier).state = primary;
+  }
 }
 
 final myLocationsProvider =
@@ -102,13 +112,18 @@ final locationSearchResultsProvider =
   return ref.read(locationRepositoryProvider).search(query);
 });
 
-/// Nearest dong for device GPS (falls back to 신촌동).
-Future<LocationItem> resolveLocationFromGps() async {
-  final fix = await sl<LocationService>().currentPosition();
-  if (fix == null) return kDefaultLocation;
-  final nearest = await sl<LocationRepository>().reverseGeo(
-    latitude: fix.latitude,
-    longitude: fix.longitude,
-  );
-  return nearest ?? kDefaultLocation;
+final locationServiceProvider = Provider<LocationService>((ref) {
+  return sl<LocationService>();
+});
+
+/// "현재 위치로 동 찾기": GPS fix → `reverse-geo`. [location] is null when the
+/// permission/GPS step failed ([status]) or the server found no dong.
+Future<({LocationFixStatus status, LocationItem? location})>
+    resolveLocationFromGps(WidgetRef ref) async {
+  final fix = await ref.read(locationServiceProvider).currentPosition();
+  if (!fix.isGranted) return (status: fix.status, location: null);
+  final location = await ref
+      .read(locationRepositoryProvider)
+      .getReverseGeo(fix.latitude!, fix.longitude!);
+  return (status: fix.status, location: location);
 }

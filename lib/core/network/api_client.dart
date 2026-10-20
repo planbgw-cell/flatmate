@@ -78,6 +78,14 @@ class ApiClient {
     );
   }
 
+  Future<Response<T>> patch<T>(
+    String path, {
+    Object? data,
+    Options? options,
+  }) {
+    return _guard(() => _dio.patch<T>(path, data: data, options: options));
+  }
+
   Future<Response<T>> put<T>(
     String path, {
     Object? data,

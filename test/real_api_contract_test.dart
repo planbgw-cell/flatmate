@@ -322,6 +322,83 @@ void main() {
       );
     });
 
+    test('signup sends location_id; UserOut maps primary_location', () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          201,
+          {
+            ..._me,
+            'primary_location': {
+              'id': 12,
+              'name': '정자동',
+              'full_name': '성남시 분당구 정자동',
+              'sido': '경기도',
+              'sigungu': '성남시 분당구',
+              'dong': '정자동',
+              'region_code': '4113554500',
+              'lat': 37.3656,
+              'lng': 127.1083,
+            },
+            'location_verified_at': '2026-10-20T10:17:26Z',
+          },
+        ),
+        signedIn: false,
+      );
+      final user = await DioAuthRepository(api).signup(
+        email: 'qa@example.com',
+        password: 'Flatmate123!',
+        nickname: 'QA',
+        locationId: 12,
+      );
+      expect(adapter.requests.single.data['location_id'], 12);
+      expect(user.primaryLocation?.id, '12');
+      expect(user.primaryLocation?.fullName, '성남시 분당구 정자동');
+      expect(user.locationVerifiedAt, DateTime.utc(2026, 10, 20, 10, 17, 26));
+    });
+
+    test('signup without a dong omits location_id', () async {
+      final (api, adapter, _) = await _client(
+        (_) => (201, _me),
+        signedIn: false,
+      );
+      final user = await DioAuthRepository(api).signup(
+        email: 'qa@example.com',
+        password: 'Flatmate123!',
+        nickname: 'QA',
+      );
+      expect(
+        (adapter.requests.single.data as Map).containsKey('location_id'),
+        isFalse,
+      );
+      expect(user.primaryLocation, isNull);
+    });
+
+    test('updateLocation → PATCH /auth/location {location_id}', () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          200,
+          {
+            ..._me,
+            'primary_location': {
+              'id': 10,
+              'name': '청룡동',
+              'full_name': '관악구 청룡동',
+              'dong': '청룡동',
+              'lat': 37.4812,
+              'lng': 126.9527,
+            },
+          },
+        ),
+      );
+      final user = await DioAuthRepository(api).updateLocation(10);
+      final request = adapter.requests.single;
+      expect(request.method, 'PATCH');
+      expect(request.path, '/auth/location');
+      expect(request.data, {'location_id': 10});
+      expect(request.headers['Authorization'], 'Bearer jwt-abc');
+      expect(user.primaryLocation?.fullName, '관악구 청룡동');
+    });
+
     test('401 → POST /auth/refresh once → replays requests with new token',
         () async {
       final (api, adapter, tokens) = await _client((o) {
@@ -545,32 +622,74 @@ void main() {
     expect(adapter.requests[1].queryParameters['sort'], 'latest');
   });
 
-  test('locations map LocationOut and use /locations/nearest', () async {
-    final (api, adapter, _) = await _client(
-      (_) => (
-        200,
-        [
+  group('locations', () {
+    test('getReverseGeo calls /locations/reverse-geo and maps ReverseGeoOut',
+        () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          200,
           {
-            'id': 10,
-            'name': '청룡동',
-            'sido': '서울',
-            'sigungu': '관악구',
-            'dong': '청룡동',
-            'lat': 37.4812,
-            'lng': 126.9527,
-            'distance_m': 0.0,
+            'location': {
+              'id': 12,
+              'name': '정자동',
+              'full_name': '성남시 분당구 정자동',
+              'sido': '경기도',
+              'sigungu': '성남시 분당구',
+              'dong': '정자동',
+              'region_code': '4113554500',
+              'lat': 37.3656,
+              'lng': 127.1083,
+              'distance_m': null,
+            },
+            'source': 'kakao',
+            'cache_distance_m': null,
           },
-        ],
-      ),
-    );
-    final repo = DioLocationRepository(api);
-    final nearest =
-        await repo.reverseGeo(latitude: 37.4812, longitude: 126.9527);
-    expect(adapter.requests.single.path, '/locations/nearest');
-    expect(nearest?.fullName, '서울 관악구 청룡동');
+        ),
+      );
+      final location =
+          await DioLocationRepository(api).getReverseGeo(37.3659, 127.1081);
 
-    final results = await repo.search('관악');
-    expect(adapter.requests.last.queryParameters['q'], '관악');
-    expect(results.single.dongName, '청룡동');
+      final request = adapter.requests.single;
+      expect(request.path, '/locations/reverse-geo');
+      expect(request.queryParameters, {'lat': 37.3659, 'lng': 127.1081});
+      expect(location?.id, '12');
+      expect(location?.dongName, '정자동');
+      expect(location?.serverFullName, '성남시 분당구 정자동');
+      expect(location?.fullName, '성남시 분당구 정자동');
+      expect(location?.regionCode, '4113554500');
+      expect(location?.latitude, 37.3656);
+    });
+
+    test('getReverseGeo returns null without a location payload', () async {
+      final (api, _, _) = await _client((_) => (200, {'source': 'db'}));
+      expect(
+        await DioLocationRepository(api).getReverseGeo(37.0, 127.0),
+        isNull,
+      );
+    });
+
+    test('search maps LocationOut; fullName falls back to sido/sigungu/dong',
+        () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          200,
+          [
+            {
+              'id': 10,
+              'name': '청룡동',
+              'sido': '서울',
+              'sigungu': '관악구',
+              'dong': '청룡동',
+              'lat': 37.4812,
+              'lng': 126.9527,
+            },
+          ],
+        ),
+      );
+      final results = await DioLocationRepository(api).search('관악');
+      expect(adapter.requests.single.queryParameters['q'], '관악');
+      expect(results.single.dongName, '청룡동');
+      expect(results.single.fullName, '서울 관악구 청룡동');
+    });
   });
 }

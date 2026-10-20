@@ -66,6 +66,16 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
     ScaffoldMessenger.of(tester.element(scaffolds.last)).clearSnackBars();
     await _pumpFor(tester, const Duration(milliseconds: 300));
   }
+  // Soft keyboard shrinks lazy lists; close it and scroll the target in.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await _pumpFor(tester, const Duration(milliseconds: 400));
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      finder,
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
+  }
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump(const Duration(milliseconds: 300));
@@ -143,13 +153,20 @@ void main() {
     // Account A: sign up on the phone (auto login → access + refresh token).
     await _pumpUntil(tester, find.text('회원가입'));
     await _tap(tester, find.text('회원가입'));
-    await _pumpUntil(tester, find.text('가입하고 시작하기'));
+    await _pumpUntil(tester, find.text('다음'));
     final form = find.byType(TextFormField);
     await tester.enterText(form.at(0), email);
     await tester.enterText(form.at(1), _password);
     await tester.enterText(form.at(2), _password);
     await tester.enterText(form.at(3), nickname);
-    await _tap(tester, find.text('가입하고 시작하기'));
+    await _tap(tester, find.text('다음'));
+    await _pumpUntil(tester, find.text('현재 위치로 동네 찾기'));
+    await _tap(tester, find.text('현재 위치로 동네 찾기'));
+    await _pumpUntil(
+      tester,
+      find.byKey(const ValueKey('signup-selected-dong')),
+    );
+    await _tap(tester, find.text('가입 완료'));
     await _pumpUntil(tester, find.text('글쓰기'));
     expect(tokens.accessToken, startsWith('eyJ'));
     expect(tokens.refreshToken, startsWith('eyJ'));

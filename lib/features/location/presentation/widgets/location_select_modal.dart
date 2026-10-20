@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/routes/route_names.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/location_item.dart';
 import '../providers/location_provider.dart';
+import 'gps_feedback.dart';
 import 'location_radius_slider.dart';
 
 Future<void> showLocationSelectModal(BuildContext context) {
@@ -40,21 +44,39 @@ class _LocationSelectModalState extends ConsumerState<LocationSelectModal> {
 
   Future<void> _findByGps() async {
     setState(() => _gpsLoading = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final service = ref.read(locationServiceProvider);
     try {
-      final nearest = await resolveLocationFromGps();
+      final result = await resolveLocationFromGps(ref);
       if (!mounted) return;
-      ref.read(myLocationsProvider.notifier).select(nearest);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${nearest.dongName}으로 설정했어요.')),
-      );
-    } catch (_) {
+      final location = result.location;
+      if (location != null) {
+        ref.read(myLocationsProvider.notifier).select(location);
+        Navigator.of(context).pop();
+        messenger.showSnackBar(
+          SnackBar(content: Text('${location.fullName}으로 설정했어요.')),
+        );
+        return;
+      }
+      messenger.showSnackBar(gpsFailureSnackBar(result.status, service));
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('내 위치로 동네를 찾지 못했어요.')),
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e is ApiException ? e.message : '내 위치로 동네를 찾지 못했어요.',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _gpsLoading = false);
     }
+  }
+
+  void _openMapPicker() {
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.push(RouteNames.locationMapPicker);
   }
 
   @override
@@ -171,9 +193,26 @@ class _LocationSelectModalState extends ConsumerState<LocationSelectModal> {
                       )
                     : const Icon(Icons.my_location, size: 20),
                 label: Text(
-                  _gpsLoading ? '위치 확인 중…' : '내 위치로 동네 찾기',
+                  _gpsLoading ? '위치 확인 중…' : '현재 위치로 동 찾기',
                   style: AppTypography.titleMedium,
                 ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: AppColors.border),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _gpsLoading ? null : _openMapPicker,
+                icon: const Icon(Icons.map_outlined, size: 20),
+                label: Text('지도에서 위치 선택', style: AppTypography.titleMedium),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
                   side: const BorderSide(color: AppColors.border),

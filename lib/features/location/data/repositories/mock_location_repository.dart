@@ -19,16 +19,13 @@ class MockLocationRepository implements LocationRepository {
   }
 
   @override
-  Future<LocationItem?> reverseGeo({
-    required double latitude,
-    required double longitude,
-  }) async {
+  Future<LocationItem?> getReverseGeo(double lat, double lng) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final catalog = buildMockLocations();
     LocationItem nearest = catalog.first;
     var best = double.infinity;
     for (final loc in catalog) {
-      final d = loc.distanceKmToCoords(latitude, longitude);
+      final d = loc.distanceKmToCoords(lat, lng);
       if (d < best) {
         best = d;
         nearest = loc;

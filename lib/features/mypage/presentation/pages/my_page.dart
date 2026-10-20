@@ -38,7 +38,13 @@ class MyPage extends ConsumerWidget {
                   style: AppTypography.titleMedium,
                 ),
                 subtitle: Text(
-                  user?.email ?? '로그인하고 동네 이웃과 거래해 보세요.',
+                  user == null
+                      ? '로그인하고 동네 이웃과 거래해 보세요.'
+                      : [
+                          user.email,
+                          if (user.primaryLocation != null)
+                            '대표 동네 · ${user.primaryLocation!.fullName}',
+                        ].join('\n'),
                   style: AppTypography.bodyMedium,
                 ),
               ),

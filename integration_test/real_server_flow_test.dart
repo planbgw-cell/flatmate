@@ -64,6 +64,16 @@ Future<void> _clearSnackBars(WidgetTester tester) async {
 
 Future<void> _tap(WidgetTester tester, Finder finder) async {
   await _clearSnackBars(tester);
+  // Soft keyboard shrinks lazy lists; close it and scroll the target in.
+  FocusManager.instance.primaryFocus?.unfocus();
+  await _pumpFor(tester, const Duration(milliseconds: 400));
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      finder,
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
+  }
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump(const Duration(milliseconds: 300));
@@ -139,13 +149,20 @@ void main() {
     await _pumpUntil(tester, find.text('회원가입'));
     _step('splash → 로그인 화면 진입');
     await _tap(tester, find.text('회원가입'));
-    await _pumpUntil(tester, find.text('가입하고 시작하기'));
+    await _pumpUntil(tester, find.text('다음'));
     final form = find.byType(TextFormField);
     await tester.enterText(form.at(0), email);
     await tester.enterText(form.at(1), _password);
     await tester.enterText(form.at(2), _password);
     await tester.enterText(form.at(3), nickname);
-    await _tap(tester, find.text('가입하고 시작하기'));
+    await _tap(tester, find.text('다음'));
+    await _pumpUntil(tester, find.text('현재 위치로 동네 찾기'));
+    await _tap(tester, find.text('현재 위치로 동네 찾기'));
+    await _pumpUntil(
+      tester,
+      find.byKey(const ValueKey('signup-selected-dong')),
+    );
+    await _tap(tester, find.text('가입 완료'));
     await _pumpUntil(tester, find.text('글쓰기'));
 
     final tokens = sl<TokenStorage>();
@@ -163,7 +180,7 @@ void main() {
     _step('정자동 선택 → 반경 3km 피드에 "$_sellerJeongjaPost" 노출');
 
     // 3) 동네: 청룡동(서울대입구역) → only nearby posts.
-    await _selectDong(tester, query: '청룡', fullName: '서울 관악구 청룡동');
+    await _selectDong(tester, query: '청룡', fullName: '관악구 청룡동');
     await _pumpUntil(tester, find.textContaining(_sellerSnuPost));
     expect(find.textContaining(_sellerJeongjaPost), findsNothing);
     _step('청룡동(서울대입구역) 선택 → "$_sellerSnuPost"만 노출, 정자동 글 제외');

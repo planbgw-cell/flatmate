@@ -1,12 +1,19 @@
+import '../../../location/data/mappers/location_mapper.dart';
 import '../../domain/models/auth_user.dart';
 
 AuthUser authUserFromJson(Map<String, dynamic> json) {
+  final primary = json['primary_location'];
   return AuthUser(
     id: json['id']?.toString() ?? '',
     email: json['email']?.toString() ?? '',
     nickname: json['nickname']?.toString() ?? '',
     profileImage: json['profile_image']?.toString(),
     createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+    primaryLocation: primary is Map
+        ? locationItemFromJson(Map<String, dynamic>.from(primary))
+        : null,
+    locationVerifiedAt:
+        DateTime.tryParse(json['location_verified_at']?.toString() ?? ''),
   );
 }
 

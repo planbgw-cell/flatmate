@@ -1,8 +1,9 @@
 import '../../../../core/network/api_client.dart';
 import '../../domain/models/location_item.dart';
 import '../../domain/repositories/location_repository.dart';
+import '../mappers/location_mapper.dart';
 
-/// FastAPI location repository (`/locations`, `/locations/nearest`).
+/// FastAPI location repository (`/locations`, `/locations/reverse-geo`).
 class DioLocationRepository implements LocationRepository {
   DioLocationRepository(this._api);
 
@@ -19,17 +20,17 @@ class DioLocationRepository implements LocationRepository {
     return _parseList(response.data);
   }
 
+  /// `ReverseGeoOut` = `{location: LocationOut, source: db|kakao, …}`.
   @override
-  Future<LocationItem?> reverseGeo({
-    required double latitude,
-    required double longitude,
-  }) async {
+  Future<LocationItem?> getReverseGeo(double lat, double lng) async {
     final response = await _api.get<dynamic>(
-      '/locations/nearest',
-      queryParameters: {'lat': latitude, 'lng': longitude, 'limit': 1},
+      '/locations/reverse-geo',
+      queryParameters: {'lat': lat, 'lng': lng},
     );
-    final list = _parseList(response.data);
-    return list.isEmpty ? null : list.first;
+    final data = response.data;
+    final location = data is Map ? data['location'] : null;
+    if (location is! Map) return null;
+    return locationItemFromJson(Map<String, dynamic>.from(location));
   }
 
   List<LocationItem> _parseList(dynamic data) {
@@ -39,17 +40,4 @@ class DioLocationRepository implements LocationRepository {
         .map((e) => locationItemFromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
-}
-
-/// `LocationOut` → [LocationItem].
-LocationItem locationItemFromJson(Map<String, dynamic> json) {
-  final name = json['name']?.toString() ?? '';
-  return LocationItem(
-    id: json['id']?.toString() ?? '',
-    cityName: json['sido']?.toString() ?? '',
-    districtName: json['sigungu']?.toString() ?? '',
-    dongName: json['dong']?.toString() ?? name,
-    latitude: (json['lat'] as num?)?.toDouble() ?? 0,
-    longitude: (json['lng'] as num?)?.toDouble() ?? 0,
-  );
 }

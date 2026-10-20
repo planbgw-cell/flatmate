@@ -1,3 +1,5 @@
+import '../../../location/domain/models/location_item.dart';
+
 class AuthUser {
   const AuthUser({
     required this.id,
@@ -5,6 +7,8 @@ class AuthUser {
     required this.nickname,
     this.profileImage,
     this.createdAt,
+    this.primaryLocation,
+    this.locationVerifiedAt,
   });
 
   final String id;
@@ -12,6 +16,24 @@ class AuthUser {
   final String nickname;
   final String? profileImage;
   final DateTime? createdAt;
+
+  /// 대표 동네 (`primary_location`); bound to the feed on login / app start.
+  final LocationItem? primaryLocation;
+
+  /// When the primary dong was last set (GPS / map / signup).
+  final DateTime? locationVerifiedAt;
+
+  AuthUser copyWith({LocationItem? primaryLocation}) {
+    return AuthUser(
+      id: id,
+      email: email,
+      nickname: nickname,
+      profileImage: profileImage,
+      createdAt: createdAt,
+      primaryLocation: primaryLocation ?? this.primaryLocation,
+      locationVerifiedAt: locationVerifiedAt,
+    );
+  }
 }
 
 /// Result of a successful login (`POST /auth/login`).

@@ -26,7 +26,7 @@ dependencies:
 
   # Local Storage & Geo Location
   shared_preferences: ^2.2.2
-  geolocator: ^10.1.0
+  geolocator: ^14.0.0
 
   # UI Components
   flutter_svg: ^2.0.10
@@ -34,6 +34,8 @@ dependencies:
   flutter_riverpod: ^3.4.3
   flutter_secure_storage: ^11.2.0
   web_socket_channel: ^3.0.3
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

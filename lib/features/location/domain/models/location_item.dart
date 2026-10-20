@@ -9,6 +9,8 @@ class LocationItem {
     required this.dongName,
     required this.latitude,
     required this.longitude,
+    this.serverFullName,
+    this.regionCode,
   });
 
   final String id;
@@ -18,9 +20,22 @@ class LocationItem {
   final double latitude;
   final double longitude;
 
+  /// Server display name (`full_name`, e.g. "성남시 분당구 정자동"). Preferred
+  /// over composing sido/sigungu, whose split differs between data sources.
+  final String? serverFullName;
+
+  /// 행정동 코드 (`region_code`) when resolved via reverse-geo.
+  final String? regionCode;
+
   String get displayName => dongName;
 
-  String get fullName => '$cityName $districtName $dongName';
+  String get fullName {
+    final server = serverFullName;
+    if (server != null && server.isNotEmpty) return server;
+    return [cityName, districtName, dongName]
+        .where((part) => part.isNotEmpty)
+        .join(' ');
+  }
 
   /// Haversine distance in kilometers.
   double distanceKmTo(LocationItem other) {

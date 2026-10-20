@@ -12,6 +12,7 @@ class MockAuthRepository implements AuthRepository {
     required String email,
     required String password,
     required String nickname,
+    int? locationId,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     if (_accounts.containsKey(email)) {
@@ -60,5 +61,12 @@ class MockAuthRepository implements AuthRepository {
     await Future<void>.delayed(const Duration(milliseconds: 150));
     return _current ??
         const AuthUser(id: 'me', email: 'guest@flatmate.app', nickname: '게스트');
+  }
+
+  /// Mock catalog dongs have no server ids, so the 대표 동네 stays local.
+  @override
+  Future<AuthUser> updateLocation(int locationId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    return getMe();
   }
 }

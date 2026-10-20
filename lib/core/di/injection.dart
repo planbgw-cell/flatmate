@@ -18,6 +18,7 @@ import '../../features/local_life/data/datasources/local_life_remote_datasource.
 import '../../features/local_life/data/repositories/local_life_repository_impl.dart';
 import '../../features/local_life/domain/repositories/local_life_repository.dart';
 import '../../features/local_life/domain/usecases/get_local_posts_usecase.dart';
+import '../../features/location/data/datasources/location_service.dart';
 import '../../features/location/data/repositories/dio_location_repository.dart';
 import '../../features/location/data/repositories/mock_location_repository.dart';
 import '../../features/location/domain/repositories/location_repository.dart';
@@ -33,8 +34,6 @@ import '../auth/token_refresher.dart';
 import '../auth/token_storage.dart';
 import '../network/api_client.dart';
 import '../network/dio_client.dart';
-import '../utils/location_service.dart';
-
 final sl = GetIt.instance;
 
 Future<void> configureDependencies() async {

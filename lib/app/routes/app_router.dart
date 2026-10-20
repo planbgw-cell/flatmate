@@ -12,6 +12,7 @@ import '../../features/chat/presentation/screens/chat_room_screen.dart';
 import '../../features/feed/domain/models/feed_item.dart';
 import '../../features/feed/presentation/pages/feed_detail_page.dart';
 import '../../features/feed/presentation/screens/feed_detail_screen.dart';
+import '../../features/location/presentation/screens/location_map_picker_screen.dart';
 import '../../features/main/presentation/main_screen.dart';
 import '../../features/main/presentation/screens/tab_screens.dart';
 import '../../features/post_create/presentation/screens/general_create_screen.dart';
@@ -31,12 +32,38 @@ const _protectedPrefixes = [
   RouteNames.localLife,
 ];
 
+/// Re-runs redirects only when the session is lost (logout / refresh failure).
+///
+/// Login and access-token rotation also notify [TokenStorage]; refreshing the
+/// router then would rebuild pushed pages (e.g. a login pushed from a shell
+/// tab) as new States and drop their in-flight work.
+class _SessionLossListenable extends ChangeNotifier {
+  _SessionLossListenable(this._tokens) : _hadSession = _tokens.hasSession {
+    _tokens.addListener(_onTokensChanged);
+  }
+
+  final TokenStorage _tokens;
+  bool _hadSession;
+
+  void _onTokensChanged() {
+    final hasSession = _tokens.hasSession;
+    if (_hadSession && !hasSession) notifyListeners();
+    _hadSession = hasSession;
+  }
+
+  @override
+  void dispose() {
+    _tokens.removeListener(_onTokensChanged);
+    super.dispose();
+  }
+}
+
 GoRouter createAppRouter({String? initialLocation}) {
   final tokens = sl<TokenStorage>();
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: initialLocation ?? RouteNames.splash,
-    refreshListenable: tokens,
+    refreshListenable: _SessionLossListenable(tokens),
     redirect: (context, state) {
       final path = state.uri.path;
       const authPaths = [RouteNames.login, RouteNames.signUp, RouteNames.splash];
@@ -131,6 +158,13 @@ GoRouter createAppRouter({String? initialLocation}) {
         path: RouteNames.postCreateGeneral,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const GeneralCreateScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.locationMapPicker,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => LocationMapPickerScreen(
+          applySelection: state.uri.queryParameters['apply'] != 'false',
+        ),
       ),
       GoRoute(
         path: RouteNames.chat,

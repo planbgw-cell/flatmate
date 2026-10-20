@@ -18,6 +18,10 @@ abstract final class RouteNames {
   static const postCreateGeneral = '/post/create/general';
   static const chat = '/chat';
   static const chatRoom = '/chat/room/:roomId';
+  static const locationMapPicker = '/location/map-picker';
+
+  /// Picker that only returns the dong (signup onboarding).
+  static const locationMapPickerResult = '$locationMapPicker?apply=false';
 
   static String chatRoomPath(String roomId) => '/chat/room/$roomId';
   static String loginPath([String? from]) => from == null
