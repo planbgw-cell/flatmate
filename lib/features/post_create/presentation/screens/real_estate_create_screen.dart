@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../feed/domain/models/feed_extra_meta.dart';
+import '../../../feed/domain/models/feed_item.dart';
+import '../../domain/post_image.dart';
 import '../providers/create_post_provider.dart';
 import '../widgets/create_post_scaffold.dart';
 import '../widgets/image_picker_grid.dart';
@@ -14,7 +15,10 @@ import '../widgets/post_form_fields.dart';
 /// 부동산 (`REAL_ESTATE`): room_type · deposit · monthly_rent (만원) ·
 /// maintenance_fee · is_short_term.
 class RealEstateCreateScreen extends ConsumerStatefulWidget {
-  const RealEstateCreateScreen({super.key});
+  const RealEstateCreateScreen({super.key, this.targetFeed});
+
+  /// Edit mode (`PATCH /feeds/{id}`) when set; fields are prefilled from it.
+  final FeedItem? targetFeed;
 
   @override
   ConsumerState<RealEstateCreateScreen> createState() =>
@@ -29,9 +33,25 @@ class _RealEstateCreateScreenState
   final _rent = TextEditingController();
   final _maintenance = TextEditingController();
 
-  List<XFile> _images = [];
+  List<PostImage> _images = [];
   RoomType _roomType = RoomType.oneRoom;
   bool _shortTerm = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final target = widget.targetFeed;
+    if (target == null) return;
+    final meta = FeedExtraMeta(FeedCategory.housing, target.extraMeta);
+    _title.text = target.title;
+    _body.text = target.description;
+    _images = remotePostImages(target);
+    _roomType = meta.roomType ?? RoomType.oneRoom;
+    _shortTerm = meta.isShortTerm;
+    _deposit.text = meta.deposit?.toString() ?? '';
+    _rent.text = meta.monthlyRent?.toString() ?? '';
+    _maintenance.text = meta.maintenanceFee?.toString() ?? '';
+  }
 
   @override
   void dispose() {
@@ -62,7 +82,8 @@ class _RealEstateCreateScreenState
   @override
   Widget build(BuildContext context) {
     return CreatePostScaffold(
-      title: '부동산 / 주거 등록',
+      title: widget.targetFeed == null ? '부동산 / 주거 등록' : '글 수정하기',
+      editing: widget.targetFeed,
       buildDraft: _draft,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

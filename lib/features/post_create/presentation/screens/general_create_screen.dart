@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../feed/domain/models/feed_extra_meta.dart';
+import '../../../feed/domain/models/feed_item.dart';
+import '../../domain/post_image.dart';
 import '../providers/create_post_provider.dart';
 import '../widgets/create_post_scaffold.dart';
 import '../widgets/image_picker_grid.dart';
@@ -13,7 +14,10 @@ import '../widgets/post_form_fields.dart';
 
 /// 일반 / 중고 (`GENERAL`): price (원) · is_free · can_negotiate.
 class GeneralCreateScreen extends ConsumerStatefulWidget {
-  const GeneralCreateScreen({super.key});
+  const GeneralCreateScreen({super.key, this.targetFeed});
+
+  /// Edit mode (`PATCH /feeds/{id}`) when set; fields are prefilled from it.
+  final FeedItem? targetFeed;
 
   @override
   ConsumerState<GeneralCreateScreen> createState() =>
@@ -25,9 +29,24 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
   final _body = TextEditingController();
   final _price = TextEditingController();
 
-  List<XFile> _images = [];
+  List<PostImage> _images = [];
   bool _isFree = false;
   bool _canNegotiate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final target = widget.targetFeed;
+    if (target == null) return;
+    final meta = FeedExtraMeta(FeedCategory.market, target.extraMeta);
+    _title.text = target.title;
+    _body.text = target.description;
+    _images = remotePostImages(target);
+    _isFree = meta.isFree;
+    _canNegotiate = meta.canNegotiate;
+    final price = meta.price;
+    if (!_isFree && price != null && price > 0) _price.text = '$price';
+  }
 
   @override
   void dispose() {
@@ -54,7 +73,8 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return CreatePostScaffold(
-      title: '일반글 작성',
+      title: widget.targetFeed == null ? '일반글 작성' : '글 수정하기',
+      editing: widget.targetFeed,
       buildDraft: _draft,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

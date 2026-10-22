@@ -40,6 +40,16 @@ abstract class FeedRepository {
   /// 관심 추가/해제 (`POST` / `DELETE /feeds/{id}/like`).
   Future<LikeResult> toggleLike(String id, {required bool currentlyLiked});
 
+  /// Author only (`PATCH /feeds/{id}`). [imageUrls] are server paths (first
+  /// one becomes the thumbnail); `feed_type` cannot change.
+  Future<FeedItem> updateFeed(
+    String id, {
+    required String title,
+    required String content,
+    required Map<String, dynamic> extraMeta,
+    required List<String> imageUrls,
+  });
+
   /// Author only (`PATCH /feeds/{id}/status`).
   Future<FeedItem> updateTradeStatus(String id, TradeStatus status);
 

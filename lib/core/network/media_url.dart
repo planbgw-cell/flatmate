@@ -9,3 +9,15 @@ String resolveMediaUrl(String? url, {String? apiBaseUrl}) {
   final base = Uri.parse(apiBaseUrl ?? AppConfig.resolve().apiBaseUrl);
   return base.replace(path: value, query: null, fragment: null).toString();
 }
+
+/// Inverse of [resolveMediaUrl] for request bodies: URLs on the API origin go
+/// back to `/static/…` paths; external URLs are kept as-is.
+String toServerMediaPath(String url, {String? apiBaseUrl}) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || !uri.hasScheme) return url;
+  final base = Uri.parse(apiBaseUrl ?? AppConfig.resolve().apiBaseUrl);
+  final sameOrigin = uri.scheme == base.scheme &&
+      uri.host == base.host &&
+      uri.port == base.port;
+  return sameOrigin ? uri.path : url;
+}

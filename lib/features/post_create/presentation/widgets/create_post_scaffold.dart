@@ -6,6 +6,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../feed/domain/models/feed_item.dart';
 import '../providers/create_post_provider.dart';
 
 typedef CreatePostDraftBuilder = CreatePostDraft Function();
@@ -16,20 +17,31 @@ class CreatePostScaffold extends ConsumerWidget {
     required this.title,
     required this.body,
     required this.buildDraft,
+    this.editing,
   });
 
   final String title;
   final Widget body;
   final CreatePostDraftBuilder buildDraft;
 
+  /// Edit mode: the post being edited; the screen pops with the updated item.
+  final FeedItem? editing;
+
+  bool get isEdit => editing != null;
+
   Future<void> _submit(BuildContext context, WidgetRef ref) async {
+    final verb = isEdit ? '수정' : '등록';
     try {
-      await ref.read(createPostProvider.notifier).submit(buildDraft());
+      final saved = await ref
+          .read(createPostProvider.notifier)
+          .submit(buildDraft(), editing: editing);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('게시글이 등록되었습니다.')),
+        SnackBar(
+          content: Text(isEdit ? '게시글을 수정했어요.' : '게시글이 등록되었습니다.'),
+        ),
       );
-      context.pop();
+      context.pop(isEdit ? saved : null);
     } on CreatePostException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,7 +52,9 @@ class CreatePostScaffold extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e is ApiException ? '등록에 실패했습니다. ${e.message}' : '등록에 실패했습니다.',
+            e is ApiException
+                ? '$verb에 실패했습니다. ${e.message}'
+                : '$verb에 실패했습니다.',
           ),
         ),
       );
@@ -78,7 +92,8 @@ class CreatePostScaffold extends ConsumerWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Text(
-                    '완료',
+                    isEdit ? '수정 완료' : '완료',
+                    key: const ValueKey('post-submit'),
                     style: AppTypography.titleMedium.copyWith(
                       color: AppColors.primary,
                     ),

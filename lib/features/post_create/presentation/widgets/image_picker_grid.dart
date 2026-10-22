@@ -1,8 +1,11 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../../domain/post_image.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -19,8 +22,9 @@ class ImagePickerGrid extends ConsumerWidget {
     this.maxImages = 10,
   });
 
-  final List<XFile> images;
-  final ValueChanged<List<XFile>> onChanged;
+  /// Server photos (edit mode) and newly picked files, in display order.
+  final List<PostImage> images;
+  final ValueChanged<List<PostImage>> onChanged;
   final int maxImages;
 
   int get _remaining => maxImages - images.length;
@@ -61,7 +65,7 @@ class ImagePickerGrid extends ConsumerWidget {
           ? [?await picker.pickFromCamera()]
           : await picker.pickFromGallery(limit: _remaining);
       if (picked.isEmpty) return;
-      final next = [...images, ...picked];
+      final next = [...images, ...picked.map(LocalPostImage.new)];
       if (next.length > maxImages) {
         messenger.showSnackBar(
           SnackBar(content: Text('최대 $maxImages장까지만 첨부했어요.')),
@@ -132,7 +136,7 @@ class ImagePickerGrid extends ConsumerWidget {
             _ThumbTile(
               key: ValueKey('image-thumb-$i'),
               index: i,
-              path: images[i].path,
+              image: images[i],
               isCover: i == 0,
               onTap: () => _showActions(context, i),
               onRemove: () => _removeAt(i),
@@ -186,17 +190,25 @@ class _ThumbTile extends StatelessWidget {
   const _ThumbTile({
     super.key,
     required this.index,
-    required this.path,
+    required this.image,
     required this.isCover,
     required this.onTap,
     required this.onRemove,
   });
 
   final int index;
-  final String path;
+  final PostImage image;
   final bool isCover;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+
+  static final _broken = Container(
+    width: 88,
+    height: 96,
+    color: AppColors.border,
+    alignment: Alignment.center,
+    child: const Icon(Icons.broken_image_outlined),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -206,20 +218,26 @@ class _ThumbTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              File(path),
-              width: 88,
-              height: 96,
-              fit: BoxFit.cover,
-              cacheWidth: 264,
-              errorBuilder: (_, _, _) => Container(
-                width: 88,
-                height: 96,
-                color: AppColors.border,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image_outlined),
-              ),
-            ),
+            child: switch (image) {
+              RemotePostImage(:final url) => CachedNetworkImage(
+                  imageUrl: url,
+                  width: 88,
+                  height: 96,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 264,
+                  placeholder: (_, _) =>
+                      Container(width: 88, height: 96, color: AppColors.border),
+                  errorWidget: (_, _, _) => _broken,
+                ),
+              LocalPostImage(:final file) => Image.file(
+                  File(file.path),
+                  width: 88,
+                  height: 96,
+                  fit: BoxFit.cover,
+                  cacheWidth: 264,
+                  errorBuilder: (_, _, _) => _broken,
+                ),
+            },
           ),
           if (isCover)
             Positioned(

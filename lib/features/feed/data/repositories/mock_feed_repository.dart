@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../../../location/domain/models/location_item.dart';
+import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
 
@@ -237,6 +238,32 @@ class MockFeedRepository implements FeedRepository {
       _likedOrder.remove(id);
     }
     return (isLiked: liked, likeCount: count);
+  }
+
+  @override
+  Future<FeedItem> updateFeed(
+    String id, {
+    required String title,
+    required String content,
+    required Map<String, dynamic> extraMeta,
+    required List<String> imageUrls,
+  }) async {
+    final item = await fetchById(id);
+    if (item == null) {
+      throw StateError('Feed item not found: $id');
+    }
+    final typed = FeedExtraMeta(item.category, extraMeta);
+    final updated = item.copyWith(
+      title: title,
+      description: content,
+      extraMeta: extraMeta,
+      imageUrls: imageUrls,
+      thumbnailUrl: imageUrls.isEmpty ? '' : imageUrls.first,
+      priceOrCondition: typed.priceLabel,
+      detailMeta: {for (final row in typed.rows) row.label: row.value},
+    );
+    _store[id] = updated;
+    return updated;
   }
 
   @override

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../feed/domain/models/feed_extra_meta.dart';
+import '../../../feed/domain/models/feed_item.dart';
+import '../../domain/post_image.dart';
 import '../providers/create_post_provider.dart';
 import '../widgets/create_post_scaffold.dart';
 import '../widgets/image_picker_grid.dart';
@@ -14,7 +15,10 @@ import '../widgets/post_form_fields.dart';
 /// 알바 (`JOB`): pay_type · pay_amount (원) · work_period · work_days ·
 /// work_hours.
 class JobCreateScreen extends ConsumerStatefulWidget {
-  const JobCreateScreen({super.key});
+  const JobCreateScreen({super.key, this.targetFeed});
+
+  /// Edit mode (`PATCH /feeds/{id}`) when set; fields are prefilled from it.
+  final FeedItem? targetFeed;
 
   @override
   ConsumerState<JobCreateScreen> createState() => _JobCreateScreenState();
@@ -26,10 +30,27 @@ class _JobCreateScreenState extends ConsumerState<JobCreateScreen> {
   final _pay = TextEditingController();
   final _hours = TextEditingController(text: '09:00~18:00');
 
-  List<XFile> _images = [];
+  List<PostImage> _images = [];
   PayType _payType = PayType.hourly;
   String? _period;
   Set<String> _days = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final target = widget.targetFeed;
+    if (target == null) return;
+    final meta = FeedExtraMeta(FeedCategory.job, target.extraMeta);
+    _title.text = target.title;
+    _body.text = target.description;
+    _images = remotePostImages(target);
+    _payType = meta.payType ?? PayType.hourly;
+    _pay.text = meta.payAmount?.toString() ?? '';
+    final period = meta.workPeriod;
+    _period = kWorkPeriodOptions.contains(period) ? period : null;
+    _days = meta.workDays.where(kWorkDayOptions.contains).toSet();
+    _hours.text = meta.workHours ?? '';
+  }
 
   @override
   void dispose() {
@@ -72,7 +93,8 @@ class _JobCreateScreenState extends ConsumerState<JobCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return CreatePostScaffold(
-      title: '알바 공고 등록',
+      title: widget.targetFeed == null ? '알바 공고 등록' : '글 수정하기',
+      editing: widget.targetFeed,
       buildDraft: _draft,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

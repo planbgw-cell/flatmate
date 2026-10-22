@@ -62,10 +62,20 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     return (_scrollOffset / range).clamp(0.0, 1.0);
   }
 
-  /// [⋮]: author gets 거래 상태 변경 / 게시글 삭제; others a report stub.
+  /// Structured form for the post's `feed_type` (community posts have none).
+  static String? _editRoute(FeedCategory category) => switch (category) {
+        FeedCategory.housing => RouteNames.postCreateRealEstate,
+        FeedCategory.job => RouteNames.postCreateJob,
+        FeedCategory.market => RouteNames.postCreateGeneral,
+        FeedCategory.all || FeedCategory.community => null,
+      };
+
+  /// [⋮]: author gets 게시글 수정 / 거래 상태 변경 / 게시글 삭제; others a
+  /// report stub.
   Future<void> _onMore(FeedItem item) async {
     final me = ref.read(currentUserIdProvider);
     final isAuthor = me != null && item.authorId == me;
+    final editRoute = _editRoute(item.category);
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -73,6 +83,13 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: isAuthor
               ? [
+                  if (editRoute != null)
+                    ListTile(
+                      key: const ValueKey('menu-edit'),
+                      leading: const Icon(Icons.edit_outlined),
+                      title: const Text('게시글 수정'),
+                      onTap: () => Navigator.pop(context, 'edit'),
+                    ),
                   ListTile(
                     key: const ValueKey('menu-trade-status'),
                     leading: const Icon(Icons.swap_horiz),
@@ -102,6 +119,9 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     );
     if (!mounted || action == null) return;
     switch (action) {
+      case 'edit':
+        final updated = await context.push<FeedItem>(editRoute!, extra: item);
+        if (updated != null && mounted) setState(() => _galleryIndex = 0);
       case 'status':
         final status = await showTradeStatusSheet(context, item.tradeStatus);
         if (status == null || !mounted) return;
@@ -200,6 +220,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                   StretchMode.fadeTitle,
                 ],
                 background: DetailImageCarousel(
+                  key: ValueKey(item.gallery.join('|')),
                   images: item.gallery,
                   index: _galleryIndex,
                   onPageChanged: (i) => setState(() => _galleryIndex = i),

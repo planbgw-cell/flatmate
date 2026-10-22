@@ -71,6 +71,22 @@ class FeedRepositoryImpl implements FeedRepository {
       _mock.toggleLike(id, currentlyLiked: currentlyLiked);
 
   @override
+  Future<FeedItem> updateFeed(
+    String id, {
+    required String title,
+    required String content,
+    required Map<String, dynamic> extraMeta,
+    required List<String> imageUrls,
+  }) =>
+      _mock.updateFeed(
+        id,
+        title: title,
+        content: content,
+        extraMeta: extraMeta,
+        imageUrls: imageUrls,
+      );
+
+  @override
   Future<FeedItem> updateTradeStatus(String id, TradeStatus status) =>
       _mock.updateTradeStatus(id, status);
 

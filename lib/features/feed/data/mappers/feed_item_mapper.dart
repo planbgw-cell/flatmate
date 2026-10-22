@@ -113,6 +113,21 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
   );
 }
 
+/// `FeedUpdate` body for `PATCH /feeds/{id}` (all editable fields).
+Map<String, dynamic> feedUpdateToJson({
+  required String title,
+  required String content,
+  required Map<String, dynamic> extraMeta,
+  required List<String> imageUrls,
+}) {
+  return {
+    'title': title,
+    'content': content,
+    'extra_meta': extraMeta,
+    'image_urls': imageUrls,
+  };
+}
+
 /// [FeedItem] → `FeedCreate` body for `POST /feeds`.
 ///
 /// [FeedItem.imageUrls] must hold the URLs returned by `POST /uploads/images`;

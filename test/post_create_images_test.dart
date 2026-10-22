@@ -1,4 +1,5 @@
 import 'package:flatmate_app/core/auth/token_storage.dart';
+import 'package:flatmate_app/core/network/media_url.dart';
 import 'package:flatmate_app/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:flatmate_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flatmate_app/features/feed/data/repositories/mock_feed_repository.dart';
@@ -7,6 +8,7 @@ import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
 import 'package:flatmate_app/features/post_create/data/image_picker_service.dart';
 import 'package:flatmate_app/features/post_create/data/image_upload_service.dart';
+import 'package:flatmate_app/features/post_create/domain/post_image.dart';
 import 'package:flatmate_app/features/post_create/presentation/providers/create_post_provider.dart';
 import 'package:flatmate_app/features/post_create/presentation/screens/general_create_screen.dart';
 import 'package:flatmate_app/features/post_create/presentation/screens/real_estate_create_screen.dart';
@@ -46,13 +48,61 @@ class _RecordingUpload implements ImageUploadService {
 
 class _RecordingFeeds extends MockFeedRepository {
   FeedItem? created;
+  Map<String, dynamic>? patched;
 
   @override
   Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) async {
     created = item;
     return item;
   }
+
+  @override
+  Future<FeedItem> updateFeed(
+    String id, {
+    required String title,
+    required String content,
+    required Map<String, dynamic> extraMeta,
+    required List<String> imageUrls,
+  }) async {
+    patched = {
+      'id': id,
+      'title': title,
+      'content': content,
+      'extra_meta': extraMeta,
+      'image_urls': imageUrls,
+    };
+    return _editTarget.copyWith(
+      title: title,
+      description: content,
+      extraMeta: extraMeta,
+      imageUrls: [for (final url in imageUrls) resolveMediaUrl(url)],
+      priceOrCondition: '12,000원',
+    );
+  }
 }
+
+final _editTarget = FeedItem(
+  id: '77',
+  title: '선풍기 판매',
+  neighborhood: '청룡동',
+  postedAt: DateTime(2026, 10, 18),
+  priceOrCondition: '15,000원',
+  thumbnailUrl: resolveMediaUrl('/static/images/a.png'),
+  imageUrls: [
+    resolveMediaUrl('/static/images/a.png'),
+    resolveMediaUrl('/static/images/b.png'),
+  ],
+  likeCount: 3,
+  chatCount: 1,
+  category: FeedCategory.market,
+  badges: const [FeedBadge.market],
+  isBumped: false,
+  description: '상태 좋아요',
+  authorName: '판매자',
+  authorId: '1',
+  isFavorite: true,
+  extraMeta: const {'price': 15000, 'is_free': false, 'can_negotiate': false},
+);
 
 void main() {
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
@@ -60,7 +110,9 @@ void main() {
   testWidgets('grid: gallery pick · 대표 badge · delete · make cover · max 10',
       (tester) async {
     final picker = _FakePicker(3);
-    var images = <XFile>[];
+    var images = <PostImage>[];
+    Iterable<String> paths() =>
+        images.map((e) => (e as LocalPostImage).file.path);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [postImagePickerProvider.overrideWithValue(picker)],
@@ -84,7 +136,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(picker.lastLimit, 10);
-    expect(images.map((e) => e.path), [
+    expect(paths(), [
       '/fake/photo0.png',
       '/fake/photo1.png',
       '/fake/photo2.png',
@@ -95,17 +147,19 @@ void main() {
     // X on the first photo → next one becomes 대표.
     await tester.tap(find.byKey(const ValueKey('image-remove-0')));
     await tester.pumpAndSettle();
-    expect(images.map((e) => e.path), ['/fake/photo1.png', '/fake/photo2.png']);
+    expect(paths(), ['/fake/photo1.png', '/fake/photo2.png']);
 
     // Tap → "대표 사진으로 설정" moves it to the front.
     await tester.tap(find.byKey(const ValueKey('image-thumb-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('대표 사진으로 설정'));
     await tester.pumpAndSettle();
-    expect(images.map((e) => e.path), ['/fake/photo2.png', '/fake/photo1.png']);
+    expect(paths(), ['/fake/photo2.png', '/fake/photo1.png']);
 
     // Over-pick is clamped to 10.
-    images = [for (var i = 0; i < 8; i++) XFile('/fake/x$i.png')];
+    images = [
+      for (var i = 0; i < 8; i++) LocalPostImage(XFile('/fake/x$i.png')),
+    ];
     await tester.pumpWidget(
       ProviderScope(
         overrides: [postImagePickerProvider.overrideWithValue(_FakePicker(5))],
@@ -256,6 +310,110 @@ void main() {
       'can_negotiate': false,
     });
     expect(free.created!.priceOrCondition, '나눔');
+  });
+
+  testWidgets('edit mode: prefill → keep/delete/add photos → PATCH → pop(item)',
+      (tester) async {
+    tester.view
+      ..physicalSize = const Size(1080, 2400)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    final upload = _RecordingUpload();
+    final feeds = _RecordingFeeds();
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('홈'))),
+        GoRoute(
+          path: '/edit',
+          builder: (_, state) =>
+              GeneralCreateScreen(targetFeed: state.extra as FeedItem?),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          postImagePickerProvider.overrideWithValue(_FakePicker(1)),
+          imageUploadServiceProvider.overrideWithValue(upload),
+          feedRepositoryProvider.overrideWithValue(feeds),
+          tokenStorageProvider.overrideWithValue(TokenStorage()),
+          authRepositoryProvider.overrideWithValue(MockAuthRepository()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    final result = router.push<FeedItem>('/edit', extra: _editTarget);
+    await tester.pumpAndSettle();
+
+    expect(find.text('글 수정하기'), findsOneWidget);
+    expect(find.text('수정 완료'), findsOneWidget);
+    expect(find.text('선풍기 판매'), findsOneWidget);
+    expect(find.text('상태 좋아요'), findsOneWidget);
+    expect(find.text('15000'), findsOneWidget);
+    expect(find.text('2/10'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('image-remove-0')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('image-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('앨범에서 선택'));
+    await tester.pumpAndSettle();
+    expect(find.text('2/10'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('post-title')),
+      '선풍기 (가격 인하)',
+    );
+    await tester.enterText(find.byKey(const ValueKey('field-price')), '12000');
+    await tester.tap(find.text('수정 완료'));
+    await tester.pumpAndSettle();
+
+    expect(upload.uploaded?.map((e) => e.path), ['/fake/photo0.png']);
+    expect(feeds.created, isNull);
+    expect(feeds.patched, {
+      'id': '77',
+      'title': '선풍기 (가격 인하)',
+      'content': '상태 좋아요',
+      'extra_meta': {'price': 12000, 'is_free': false, 'can_negotiate': false},
+      'image_urls': ['/static/images/b.png', '/static/images/u0.png'],
+    });
+    final updated = await result;
+    expect(updated?.title, '선풍기 (가격 인하)');
+    expect(updated?.isFavorite, isTrue);
+    expect(updated?.likeCount, 3);
+    expect(find.text('홈'), findsOneWidget);
+    expect(find.text('게시글을 수정했어요.'), findsOneWidget);
+  });
+
+  test('edit submit refreshes the detail copy without uploading', () async {
+    final upload = _RecordingUpload();
+    final container = ProviderContainer(
+      overrides: [
+        imageUploadServiceProvider.overrideWithValue(upload),
+        feedRepositoryProvider.overrideWithValue(_RecordingFeeds()),
+        tokenStorageProvider.overrideWithValue(TokenStorage()),
+        authRepositoryProvider.overrideWithValue(MockAuthRepository()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(createPostProvider.notifier).submit(
+          CreatePostDraft(
+            kind: CreatePostKind.general,
+            title: '선풍기 (수정)',
+            description: '상태 좋아요',
+            images: [RemotePostImage(_editTarget.imageUrls.last)],
+            extraMeta: const {'price': 12000, 'is_free': false},
+          ),
+          editing: _editTarget,
+        );
+
+    expect(upload.uploaded, isNull);
+    final detail = container.read(feedItemProvider(_editTarget));
+    expect(detail.title, '선풍기 (수정)');
+    expect(detail.gallery, [_editTarget.imageUrls.last]);
+    expect(container.read(feedMutationTickProvider), 1);
   });
 
   test('general without price (and not 나눔) is rejected', () {

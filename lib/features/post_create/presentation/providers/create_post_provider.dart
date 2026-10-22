@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/media_url.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../feed/domain/models/feed_extra_meta.dart';
 import '../../../feed/domain/models/feed_item.dart';
@@ -10,6 +10,7 @@ import '../../../feed/presentation/providers/feed_provider.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 import '../../data/image_picker_service.dart';
 import '../../data/image_upload_service.dart';
+import '../../domain/post_image.dart';
 
 enum CreatePostKind { realEstate, job, general }
 
@@ -26,8 +27,9 @@ class CreatePostDraft {
   final String title;
   final String description;
 
-  /// Local photos; the first one becomes the thumbnail.
-  final List<XFile> images;
+  /// Existing server photos and new local ones in display order; the first
+  /// one becomes the thumbnail.
+  final List<PostImage> images;
 
   /// Per-type `extra_meta` (see [ExtraMetaKeys]).
   final Map<String, dynamic> extraMeta;
@@ -50,7 +52,8 @@ class CreatePostException implements Exception {
 enum CreatePostPhase {
   idle(''),
   uploading('사진 업로드 중…'),
-  saving('등록 중…');
+  saving('등록 중…'),
+  updating('수정 중…');
 
   const CreatePostPhase(this.label);
   final String label;
@@ -70,8 +73,9 @@ class CreatePostNotifier extends Notifier<CreatePostPhase> {
   @override
   CreatePostPhase build() => CreatePostPhase.idle;
 
-  /// Validates → uploads photos → creates the post → refreshes the feed.
-  Future<FeedItem> submit(CreatePostDraft draft) async {
+  /// Validates → uploads new photos → creates the post (or, with [editing],
+  /// `PATCH`es it) → refreshes the feed / detail copies.
+  Future<FeedItem> submit(CreatePostDraft draft, {FeedItem? editing}) async {
     final title = draft.title.trim();
     final body = draft.description.trim();
     if (title.length < 2) {
@@ -84,9 +88,27 @@ class CreatePostNotifier extends Notifier<CreatePostPhase> {
     if (metaError != null) throw CreatePostException(metaError);
 
     try {
+      final locals = [
+        for (final image in draft.images)
+          if (image is LocalPostImage) image.file,
+      ];
       state = CreatePostPhase.uploading;
-      final imageUrls =
-          await ref.read(imageUploadServiceProvider).upload(draft.images);
+      final uploaded = locals.isEmpty
+          ? const <String>[]
+          : await ref.read(imageUploadServiceProvider).upload(locals);
+      var next = 0;
+      final imageUrls = [
+        for (final image in draft.images)
+          switch (image) {
+            RemotePostImage(:final url) => toServerMediaPath(url),
+            LocalPostImage() => uploaded[next++],
+          },
+      ];
+
+      if (editing != null) {
+        state = CreatePostPhase.updating;
+        return await _update(editing, title, body, draft.extraMeta, imageUrls);
+      }
 
       state = CreatePostPhase.saving;
       final location = ref.read(currentLocationProvider);
@@ -115,6 +137,34 @@ class CreatePostNotifier extends Notifier<CreatePostPhase> {
     } finally {
       state = CreatePostPhase.idle;
     }
+  }
+
+  Future<FeedItem> _update(
+    FeedItem editing,
+    String title,
+    String body,
+    Map<String, dynamic> extraMeta,
+    List<String> imageUrls,
+  ) async {
+    final server = await _repo.updateFeed(
+      editing.id,
+      title: title,
+      content: body,
+      extraMeta: extraMeta,
+      imageUrls: imageUrls,
+    );
+    final updated = server.copyWith(
+      isFavorite: editing.isFavorite,
+      likeCount: editing.likeCount,
+      chatCount: editing.chatCount,
+      tradeStatus: editing.tradeStatus,
+    );
+    ref.read(feedOverridesProvider.notifier).update(
+          (map) => {...map, editing.id: updated},
+        );
+    ref.read(feedListProvider.notifier).patchItem(updated);
+    ref.read(feedMutationTickProvider.notifier).state++;
+    return updated;
   }
 }
 

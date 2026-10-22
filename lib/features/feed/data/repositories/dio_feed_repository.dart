@@ -107,6 +107,26 @@ class DioFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<FeedItem> updateFeed(
+    String id, {
+    required String title,
+    required String content,
+    required Map<String, dynamic> extraMeta,
+    required List<String> imageUrls,
+  }) async {
+    final response = await _api.patch<dynamic>(
+      '/feeds/$id',
+      data: feedUpdateToJson(
+        title: title,
+        content: content,
+        extraMeta: extraMeta,
+        imageUrls: imageUrls,
+      ),
+    );
+    return _remember(_asMap(response.data));
+  }
+
+  @override
   Future<FeedItem> updateTradeStatus(String id, TradeStatus status) async {
     final response = await _api.patch<dynamic>(
       '/feeds/$id/status',

@@ -782,6 +782,47 @@ void main() {
       expect(adapter.requests.last.path, '/feeds/7');
     });
 
+    test('PATCH /feeds/{id} sends FeedUpdate and maps the edited FeedOut',
+        () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          200,
+          {
+            ..._feedOut(id: 7, title: '선풍기 (수정)', publishedAt: '2026-10-22T00:00:00Z'),
+            'content': '리모컨 포함',
+            'extra_meta': {'price': 12000, 'is_free': false, 'can_negotiate': true},
+            'price_text': '12,000원',
+            'image_urls': ['/static/images/b.png'],
+            'thumbnail_url': '/static/images/b.png',
+          },
+        ),
+      );
+      final repo = DioFeedRepository(api);
+
+      final updated = await repo.updateFeed(
+        '7',
+        title: '선풍기 (수정)',
+        content: '리모컨 포함',
+        extraMeta: const {'price': 12000, 'is_free': false, 'can_negotiate': true},
+        imageUrls: const ['/static/images/b.png'],
+      );
+      final request = adapter.requests.single;
+      expect(request.method, 'PATCH');
+      expect(request.path, '/feeds/7');
+      expect(request.headers['Authorization'], 'Bearer jwt-abc');
+      expect(request.data, {
+        'title': '선풍기 (수정)',
+        'content': '리모컨 포함',
+        'extra_meta': {'price': 12000, 'is_free': false, 'can_negotiate': true},
+        'image_urls': ['/static/images/b.png'],
+      });
+      expect(updated.title, '선풍기 (수정)');
+      expect(updated.description, '리모컨 포함');
+      expect(updated.priceOrCondition, '12,000원');
+      expect(updated.imageUrls, hasLength(1));
+      expect(updated.imageUrls.single, endsWith('/static/images/b.png'));
+    });
+
     test('GET /users/me/feeds (trade_status filter) and /users/me/likes',
         () async {
       final (api, adapter, _) = await _client(
@@ -864,6 +905,26 @@ void main() {
     );
     expect(resolveMediaUrl('https://cdn/x.png'), 'https://cdn/x.png');
     expect(resolveMediaUrl(null), '');
+  });
+
+  test('toServerMediaPath strips the API origin only', () {
+    const base = 'http://h:8000/api/v1';
+    expect(
+      toServerMediaPath('http://h:8000/static/images/a.png', apiBaseUrl: base),
+      '/static/images/a.png',
+    );
+    expect(
+      toServerMediaPath('/static/images/a.png', apiBaseUrl: base),
+      '/static/images/a.png',
+    );
+    expect(
+      toServerMediaPath('https://cdn/x.png', apiBaseUrl: base),
+      'https://cdn/x.png',
+    );
+    expect(
+      toServerMediaPath('http://other:8000/static/a.png', apiBaseUrl: base),
+      'http://other:8000/static/a.png',
+    );
   });
 
   test('GET /feeds forwards sort (distance needs coordinates)', () async {

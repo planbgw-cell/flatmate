@@ -58,6 +58,12 @@ class _SessionLossListenable extends ChangeNotifier {
   }
 }
 
+/// Post form routes open in edit mode when pushed with the post as `extra`.
+FeedItem? _editTarget(GoRouterState state) {
+  final extra = state.extra;
+  return extra is FeedItem ? extra : null;
+}
+
 GoRouter createAppRouter({String? initialLocation}) {
   final tokens = sl<TokenStorage>();
   return GoRouter(
@@ -147,17 +153,20 @@ GoRouter createAppRouter({String? initialLocation}) {
       GoRoute(
         path: RouteNames.postCreateRealEstate,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const RealEstateCreateScreen(),
+        builder: (context, state) =>
+            RealEstateCreateScreen(targetFeed: _editTarget(state)),
       ),
       GoRoute(
         path: RouteNames.postCreateJob,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const JobCreateScreen(),
+        builder: (context, state) =>
+            JobCreateScreen(targetFeed: _editTarget(state)),
       ),
       GoRoute(
         path: RouteNames.postCreateGeneral,
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const GeneralCreateScreen(),
+        builder: (context, state) =>
+            GeneralCreateScreen(targetFeed: _editTarget(state)),
       ),
       GoRoute(
         path: RouteNames.locationMapPicker,
