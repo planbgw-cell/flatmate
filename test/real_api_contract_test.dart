@@ -290,6 +290,48 @@ void main() {
       expect(created.neighborhood, '정자동');
     });
 
+    test('FeedOut author_nickname / profile image / price_text win', () async {
+      final (api, _, _) = await _client(
+        (_) => (
+          200,
+          {
+            'total': 2,
+            'page': 1,
+            'limit': 10,
+            'items': [
+              {
+                ..._feedOut(id: 7, title: '선풍기', publishedAt: '2026-10-22T00:00:00Z'),
+                'feed_type': 'GENERAL',
+                'extra': null,
+                'extra_meta': {'price': 15000, 'is_free': false, 'can_negotiate': true},
+                'author_nickname': '정자동주민',
+                'author_profile_image': '/static/images/me.png',
+                'price_text': '15,000원',
+              },
+              {
+                ..._feedOut(id: 8, title: '수집 공고', publishedAt: '2026-10-22T00:00:00Z'),
+                'feed_type': 'JOB',
+                'extra': null,
+                'extra_meta': {'pay_type': 'HOURLY', 'pay_amount': 10030},
+                'author_nickname': null,
+                'price_text': '시급 10,030원',
+              },
+            ],
+          },
+        ),
+      );
+      final items = await DioFeedRepository(api).fetchFeeds(page: 1);
+
+      expect(items[0].authorName, '정자동주민');
+      expect(items[0].authorAvatarUrl,
+          'http://121.133.47.161:8000/static/images/me.png');
+      expect(items[0].priceOrCondition, '15,000원');
+      expect(items[0].detailMeta['가격'], '15,000원');
+      expect(items[1].authorName, '이웃');
+      expect(items[1].authorAvatarUrl, isNull);
+      expect(items[1].priceOrCondition, '시급 10,030원');
+    });
+
     test('typed JOB / GENERAL extra_meta derive price labels', () async {
       final (api, _, _) = await _client(
         (_) => (
@@ -662,6 +704,7 @@ void main() {
                   'unread_count': id,
                   'feed_title': '매물$id',
                   'feed_thumbnail': '/static/images/room$id.png',
+                  'feed_price_text': '${id}5,000원',
                   'created_at': '2026-10-18T00:00:00Z',
                 },
             ],
@@ -677,6 +720,7 @@ void main() {
       expect(rooms.map((r) => r.unreadCount), [2, 1]);
       expect(rooms.first.lastMessage, '메시지2');
       expect(rooms.first.feedTitle, '매물2');
+      expect(rooms.first.feedPrice, '25,000원');
       expect(
         rooms.first.feedThumbnail,
         'http://121.133.47.161:8000/static/images/room2.png',

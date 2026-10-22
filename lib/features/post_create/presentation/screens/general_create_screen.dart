@@ -11,8 +11,7 @@ import '../widgets/create_post_scaffold.dart';
 import '../widgets/image_picker_grid.dart';
 import '../widgets/post_form_fields.dart';
 
-/// 일반 / 중고 (`GENERAL`): is_free · can_negotiate. The server schema has no
-/// price field, so a price belongs in the body text.
+/// 일반 / 중고 (`GENERAL`): price (원) · is_free · can_negotiate.
 class GeneralCreateScreen extends ConsumerStatefulWidget {
   const GeneralCreateScreen({super.key});
 
@@ -24,6 +23,7 @@ class GeneralCreateScreen extends ConsumerStatefulWidget {
 class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
   final _title = TextEditingController();
   final _body = TextEditingController();
+  final _price = TextEditingController();
 
   List<XFile> _images = [];
   bool _isFree = false;
@@ -33,6 +33,7 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
   void dispose() {
     _title.dispose();
     _body.dispose();
+    _price.dispose();
     super.dispose();
   }
 
@@ -43,6 +44,7 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
       description: _body.text,
       images: _images,
       extraMeta: {
+        ExtraMetaKeys.price: _isFree ? 0 : int.tryParse(_price.text),
         ExtraMetaKeys.isFree: _isFree,
         ExtraMetaKeys.canNegotiate: !_isFree && _canNegotiate,
       },
@@ -67,12 +69,21 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
             bodyController: _body,
             showPrice: false,
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            '판매 가격이 있다면 내용에 함께 적어 주세요.',
-            style: AppTypography.caption,
+          const SizedBox(height: AppSpacing.lg),
+          const SectionLabel('가격'),
+          IgnorePointer(
+            ignoring: _isFree,
+            child: Opacity(
+              opacity: _isFree ? 0.4 : 1,
+              child: NumberField(
+                key: const ValueKey('field-price'),
+                controller: _price,
+                label: _isFree ? '나눔 (0원)' : '판매 가격',
+                suffix: '원',
+              ),
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.xs),
           CheckboxListTile(
             key: const ValueKey('field-is-free'),
             contentPadding: EdgeInsets.zero,
@@ -81,7 +92,10 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
             title: Text('나눔하기', style: AppTypography.bodyLarge),
             value: _isFree,
             activeColor: AppColors.primary,
-            onChanged: (v) => setState(() => _isFree = v ?? false),
+            onChanged: (v) => setState(() {
+              _isFree = v ?? false;
+              if (_isFree) _price.clear();
+            }),
           ),
           SwitchListTile(
             key: const ValueKey('field-can-negotiate'),

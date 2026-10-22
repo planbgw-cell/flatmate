@@ -241,13 +241,18 @@ void main() {
       post.imageUrls[1],
     );
     final card = find.byKey(const ValueKey('detail-card-housing'));
+    // Server-formatted price_text (e.g. "월세 500/50") is shown verbatim.
+    expect(server['price_text'], isNotNull);
     expect(
-      find.descendant(of: card, matching: find.text('보증금 500 / 월세 50')),
+      find.descendant(
+        of: card,
+        matching: find.text(server['price_text'] as String),
+      ),
       findsOneWidget,
     );
     expect(find.descendant(of: card, matching: find.text('원룸')), findsWidgets);
     expect(find.descendant(of: card, matching: find.text('500만원')), findsOneWidget);
-    _step('상세: 캐러셀 1/2→2/2 (절대 URL) · 부동산 카드(원룸, 보증금 500 / 월세 50)');
+    _step('상세: 캐러셀 1/2→2/2 (절대 URL) · 부동산 카드(원룸, ${server['price_text']})');
     await _tap(tester, find.byIcon(Icons.arrow_back_rounded));
     await _pumpUntil(tester, find.byType(FeedScreen));
 

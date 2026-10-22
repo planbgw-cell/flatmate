@@ -3,9 +3,9 @@ import '../../../feed/domain/models/feed_item.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
 
-/// `ChatRoomOut` → [ChatRoom]. Everything comes from the API; an optional
-/// [feed] (known when opening from a detail screen) adds the price, which
-/// `ChatRoomOut` does not carry.
+/// `ChatRoomOut` → [ChatRoom], including the linked feed's title, thumbnail
+/// and `feed_price_text`. [feed] is only a fallback for rooms opened from a
+/// detail screen before the server fills those fields.
 ChatRoom chatRoomFromJson(Map<String, dynamic> json, {FeedItem? feed}) {
   final createdAt =
       DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now();
@@ -16,7 +16,7 @@ ChatRoom chatRoomFromJson(Map<String, dynamic> json, {FeedItem? feed}) {
     id: json['id']?.toString() ?? '',
     feedItemId: json['feed_id']?.toString() ?? '',
     feedTitle: json['feed_title']?.toString() ?? feed?.title ?? '이웃과의 대화',
-    feedPrice: feed?.priceOrCondition ?? '',
+    feedPrice: json['feed_price_text']?.toString() ?? feed?.priceOrCondition ?? '',
     feedThumbnail: thumbnail.isNotEmpty ? thumbnail : feed?.thumbnailUrl ?? '',
     opponentName: json['peer_nickname']?.toString() ?? '이웃',
     opponentProfileImage: json['peer_profile_image']?.toString(),

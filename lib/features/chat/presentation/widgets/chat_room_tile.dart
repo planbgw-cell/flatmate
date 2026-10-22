@@ -75,14 +75,32 @@ class ChatRoomTile extends StatelessWidget {
                   ),
                   if (room.feedItemId.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      room.feedTitle,
-                      key: ValueKey('room-title-${room.id}'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.caption.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            room.feedTitle,
+                            key: ValueKey('room-title-${room.id}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        if (room.feedPrice.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            room.feedPrice,
+                            key: ValueKey('room-price-${room.id}'),
+                            maxLines: 1,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                   const SizedBox(height: 4),

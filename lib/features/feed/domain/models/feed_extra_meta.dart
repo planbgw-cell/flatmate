@@ -17,7 +17,8 @@ abstract final class ExtraMetaKeys {
   static const workDays = 'work_days';
   static const workHours = 'work_hours';
 
-  // GENERAL — the server has no price field.
+  // GENERAL — price in 원 (server stores 0 for 나눔).
+  static const price = 'price';
   static const isFree = 'is_free';
   static const canNegotiate = 'can_negotiate';
 }
@@ -69,7 +70,8 @@ class FeedExtraMeta {
         FeedCategory.housing => values.containsKey(ExtraMetaKeys.roomType),
         FeedCategory.job => values.containsKey(ExtraMetaKeys.payType),
         FeedCategory.market => values.containsKey(ExtraMetaKeys.isFree) ||
-            values.containsKey(ExtraMetaKeys.canNegotiate),
+            values.containsKey(ExtraMetaKeys.canNegotiate) ||
+            values.containsKey(ExtraMetaKeys.price),
         _ => false,
       };
 
@@ -90,18 +92,22 @@ class FeedExtraMeta {
           .where((e) => e.isNotEmpty)
           .toList();
 
+  int? get price => _int(ExtraMetaKeys.price);
   bool get isFree => values[ExtraMetaKeys.isFree] == true;
   bool get canNegotiate => values[ExtraMetaKeys.canNegotiate] == true;
 
-  /// Card / bottom-bar price line, e.g. "보증금 500 / 월세 50".
+  /// Local price line (mock / offline); real posts use the server `price_text`.
   String get priceLabel => switch (category) {
         FeedCategory.housing =>
           '보증금 ${formatNumber(deposit ?? 0)} / 월세 ${formatNumber(monthlyRent ?? 0)}',
         FeedCategory.job => payAmount == null
             ? ''
             : '${payType?.label ?? '급여'} ${formatNumber(payAmount!)}원',
-        FeedCategory.market =>
-          isFree ? '나눔' : (canNegotiate ? '가격 제안 가능' : '가격 문의'),
+        FeedCategory.market => isFree
+            ? '나눔'
+            : (price != null && price! > 0)
+                ? '${formatNumber(price!)}원'
+                : '가격 문의',
         _ => '',
       };
 
@@ -129,6 +135,7 @@ class FeedExtraMeta {
           ],
         FeedCategory.market => [
             FeedDetailRow('거래 방식', isFree ? '나눔' : '판매'),
+            if (!isFree) FeedDetailRow('가격', priceLabel),
             FeedDetailRow('가격 제안', canNegotiate ? '가능' : '불가'),
           ],
         _ => const [],

@@ -24,6 +24,11 @@ FeedCategory categoryForFeedType(String? feedType) {
   return FeedCategory.community;
 }
 
+String? _nonEmpty(Object? value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? null : text;
+}
+
 List<String> _stringList(Object? raw) => raw is List
     ? raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
     : const [];
@@ -74,9 +79,11 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
     title: json['title']?.toString() ?? '',
     neighborhood: neighborhood,
     postedAt: postedAt.toLocal(),
-    priceOrCondition: typed.isStructured
-        ? typed.priceLabel
-        : meta['price_or_condition']?.toString() ?? '',
+    // Server-formatted text first ("15,000원", "월세 500/45", "나눔").
+    priceOrCondition: _nonEmpty(json['price_text']) ??
+        (typed.isStructured
+            ? typed.priceLabel
+            : meta['price_or_condition']?.toString() ?? ''),
     thumbnailUrl: thumbnail,
     imageUrls: images,
     likeCount: (meta['like_count'] as num?)?.toInt() ?? 0,
@@ -85,7 +92,13 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
     badges: typed.isStructured ? typed.badges : legacyBadges,
     isBumped: meta['is_bumped'] as bool? ?? false,
     description: json['content']?.toString() ?? '',
-    authorName: meta['author_nickname']?.toString() ?? '이웃',
+    // Collected (external) feeds have no author → "이웃".
+    authorName: _nonEmpty(json['author_nickname']) ??
+        _nonEmpty(meta['author_nickname']) ??
+        '이웃',
+    authorAvatarUrl: _nonEmpty(
+      resolveMediaUrl(json['author_profile_image']?.toString()),
+    ),
     authorId: json['author_id']?.toString(),
     ctaLabel: meta['cta_label']?.toString() ??
         (category == FeedCategory.job ? '지원하기' : '채팅하기'),

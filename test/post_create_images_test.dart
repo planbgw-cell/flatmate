@@ -8,6 +8,7 @@ import 'package:flatmate_app/features/location/domain/models/location_item.dart'
 import 'package:flatmate_app/features/post_create/data/image_picker_service.dart';
 import 'package:flatmate_app/features/post_create/data/image_upload_service.dart';
 import 'package:flatmate_app/features/post_create/presentation/providers/create_post_provider.dart';
+import 'package:flatmate_app/features/post_create/presentation/screens/general_create_screen.dart';
 import 'package:flatmate_app/features/post_create/presentation/screens/real_estate_create_screen.dart';
 import 'package:flatmate_app/features/post_create/presentation/widgets/image_picker_grid.dart';
 import 'package:flutter/material.dart';
@@ -192,6 +193,80 @@ void main() {
     });
     expect(item.priceOrCondition, '보증금 500 / 월세 50');
     expect(find.text('홈'), findsOneWidget);
+  });
+
+  testWidgets('general form: price → extra_meta; 나눔 sends price 0',
+      (tester) async {
+    tester.view
+      ..physicalSize = const Size(1080, 2400)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    Future<_RecordingFeeds> submit({required bool free}) async {
+      final feeds = _RecordingFeeds();
+      final router = GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('홈'))),
+          GoRoute(
+            path: '/create',
+            builder: (_, _) => const GeneralCreateScreen(),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          key: UniqueKey(),
+          overrides: [
+            imageUploadServiceProvider.overrideWithValue(_RecordingUpload()),
+            feedRepositoryProvider.overrideWithValue(feeds),
+            tokenStorageProvider.overrideWithValue(TokenStorage()),
+            authRepositoryProvider.overrideWithValue(MockAuthRepository()),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      router.push('/create');
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('post-title')), '선풍기 판매');
+      await tester.enterText(find.byKey(const ValueKey('post-body')), '상태 좋아요');
+      if (free) {
+        await tester.tap(find.byKey(const ValueKey('field-is-free')));
+      } else {
+        await tester.enterText(find.byKey(const ValueKey('field-price')), '15000');
+        await tester.tap(find.byKey(const ValueKey('field-can-negotiate')));
+      }
+      await tester.pump();
+      await tester.tap(find.text('완료'));
+      await tester.pumpAndSettle();
+      return feeds;
+    }
+
+    final paid = await submit(free: false);
+    expect(paid.created!.extraMeta, {
+      'price': 15000,
+      'is_free': false,
+      'can_negotiate': true,
+    });
+    expect(paid.created!.priceOrCondition, '15,000원');
+
+    final free = await submit(free: true);
+    expect(free.created!.extraMeta, {
+      'price': 0,
+      'is_free': true,
+      'can_negotiate': false,
+    });
+    expect(free.created!.priceOrCondition, '나눔');
+  });
+
+  test('general without price (and not 나눔) is rejected', () {
+    expect(
+      validateExtraMeta(CreatePostKind.general, {'is_free': false}),
+      contains('가격을 입력해 주세요'),
+    );
+    expect(
+      validateExtraMeta(CreatePostKind.general, {'price': 0, 'is_free': true}),
+      isNull,
+    );
   });
 
   testWidgets('missing rent is rejected before any upload', (tester) async {

@@ -282,7 +282,8 @@ void main() {
       menu: '일반글 작성',
       fields: {
         'post-title': generalTitle,
-        'post-body': '실서버 일반글 테스트. 가격 5,000원',
+        'post-body': '실서버 일반글 테스트.',
+        'field-price': '5000',
       },
     );
     await verifyTop(generalTitle, 'GENERAL');

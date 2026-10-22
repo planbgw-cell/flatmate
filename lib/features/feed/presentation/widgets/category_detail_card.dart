@@ -44,7 +44,8 @@ class CategoryDetailCard extends StatelessWidget {
           Text(title, style: AppTypography.titleMedium),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            meta.priceLabel,
+            item.priceOrCondition,
+            key: const ValueKey('detail-card-price'),
             style: AppTypography.header2.copyWith(color: AppColors.primary),
           ),
           if (chips.any((c) => c.isNotEmpty)) ...[

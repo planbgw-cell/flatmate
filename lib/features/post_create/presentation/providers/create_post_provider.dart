@@ -134,7 +134,11 @@ String? validateExtraMeta(CreatePostKind kind, Map<String, dynamic> meta) {
       final amount = meta[ExtraMetaKeys.payAmount];
       if (amount is! int || amount <= 0) return '급여 금액을 입력해 주세요.';
     case CreatePostKind.general:
-      break;
+      // Without a price the server stores 0 and returns no price_text.
+      final price = meta[ExtraMetaKeys.price];
+      if (meta[ExtraMetaKeys.isFree] != true && (price is! int || price <= 0)) {
+        return '가격을 입력해 주세요. (무료라면 나눔하기를 선택해 주세요)';
+      }
   }
   return null;
 }

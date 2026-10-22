@@ -74,12 +74,20 @@ class FeedCardItem extends ConsumerWidget {
                   ),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
-                    '${item.neighborhood} · ${_timeLabel(item)}',
+                    [
+                      item.authorName,
+                      if (item.neighborhood.isNotEmpty) item.neighborhood,
+                      _timeLabel(item),
+                    ].join(' · '),
+                    key: ValueKey('feed-meta-${item.id}'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: AppTypography.bodyMedium,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     item.priceOrCondition,
+                    key: ValueKey('feed-price-${item.id}'),
                     style: AppTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
