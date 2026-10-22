@@ -11,6 +11,8 @@ class MockFeedRepository implements FeedRepository {
   final Random _random;
   final Map<String, FeedItem> _store = {};
   final Set<String> _favorites = {};
+  final List<String> _likedOrder = [];
+  final Set<String> _deleted = {};
   final List<String> _userPostIds = [];
   bool _seeded = false;
 
@@ -150,7 +152,7 @@ class MockFeedRepository implements FeedRepository {
       category: category,
       location: location,
       radiusKm: radiusKm,
-    );
+    ).where((item) => !_deleted.contains(item.id)).toList();
     if (sort != FeedSort.distance || location == null) return items;
     double distance(FeedItem item) {
       final anchor = locationForNeighborhood(item.neighborhood);
@@ -198,6 +200,7 @@ class MockFeedRepository implements FeedRepository {
   Future<FeedItem?> fetchById(String id) async {
     await _delay();
     _ensureSeed();
+    if (_deleted.contains(id)) return null;
     final cached = _store[id];
     if (cached != null) return _withFavorite(cached);
 
@@ -212,27 +215,72 @@ class MockFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<FeedItem> toggleFavorite(String id) async {
-    await _delay();
-    _ensureSeed();
-    var item = _store[id] ?? await fetchById(id);
+  Future<LikeResult> toggleLike(
+    String id, {
+    required bool currentlyLiked,
+  }) async {
+    final item = await fetchById(id);
     if (item == null) {
       throw StateError('Feed item not found: $id');
     }
-
-    final liked = !_favorites.contains(id);
+    final liked = !currentlyLiked;
+    final wasLiked = _favorites.contains(id);
+    liked ? _favorites.add(id) : _favorites.remove(id);
+    final delta = liked == wasLiked ? 0 : (liked ? 1 : -1);
+    final count = (item.likeCount + delta).clamp(0, 1 << 30);
+    _store[id] = item.copyWith(isFavorite: liked, likeCount: count);
     if (liked) {
-      _favorites.add(id);
+      _likedOrder
+        ..remove(id)
+        ..insert(0, id);
     } else {
-      _favorites.remove(id);
+      _likedOrder.remove(id);
     }
+    return (isLiked: liked, likeCount: count);
+  }
 
-    final nextCount = liked
-        ? item.likeCount + 1
-        : (item.likeCount - 1).clamp(0, 1 << 30);
-    final updated = item.copyWith(isFavorite: liked, likeCount: nextCount);
+  @override
+  Future<FeedItem> updateTradeStatus(String id, TradeStatus status) async {
+    final item = await fetchById(id);
+    if (item == null) {
+      throw StateError('Feed item not found: $id');
+    }
+    final updated = item.copyWith(tradeStatus: status);
     _store[id] = updated;
     return updated;
+  }
+
+  @override
+  Future<void> deleteFeed(String id) async {
+    await _delay();
+    _deleted.add(id);
+    _userPostIds.remove(id);
+    _likedOrder.remove(id);
+    _favorites.remove(id);
+  }
+
+  /// Posts created in this session stand in for "mine".
+  @override
+  Future<List<FeedItem>> getMyFeeds({TradeStatus? status, int page = 1}) async {
+    await _delay();
+    if (page > 1) return const [];
+    return _userPostIds
+        .map((id) => _store[id])
+        .whereType<FeedItem>()
+        .where((item) => status == null || item.tradeStatus == status)
+        .map(_withFavorite)
+        .toList();
+  }
+
+  @override
+  Future<List<FeedItem>> getMyLikes({int page = 1}) async {
+    await _delay();
+    if (page > 1) return const [];
+    return _likedOrder
+        .map((id) => _store[id])
+        .whereType<FeedItem>()
+        .map(_withFavorite)
+        .toList();
   }
 
   @override

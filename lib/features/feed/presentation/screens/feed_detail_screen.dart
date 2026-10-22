@@ -12,11 +12,13 @@ import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../domain/models/feed_item.dart';
+import '../feed_actions.dart';
 import '../providers/feed_provider.dart';
 import '../widgets/author_profile_card.dart';
 import '../widgets/category_detail_card.dart';
 import '../widgets/detail_bottom_bar.dart';
 import '../widgets/detail_image_carousel.dart';
+import '../widgets/trade_status_badge.dart';
 
 /// Feed item detail — parallax gallery, trust profile, sticky CTA.
 class FeedDetailScreen extends ConsumerStatefulWidget {
@@ -58,6 +60,60 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     final range = _expandedHeight - kToolbarHeight;
     if (range <= 0) return 0;
     return (_scrollOffset / range).clamp(0.0, 1.0);
+  }
+
+  /// [⋮]: author gets 거래 상태 변경 / 게시글 삭제; others a report stub.
+  Future<void> _onMore(FeedItem item) async {
+    final me = ref.read(currentUserIdProvider);
+    final isAuthor = me != null && item.authorId == me;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: isAuthor
+              ? [
+                  ListTile(
+                    key: const ValueKey('menu-trade-status'),
+                    leading: const Icon(Icons.swap_horiz),
+                    title: const Text('거래 상태 변경'),
+                    onTap: () => Navigator.pop(context, 'status'),
+                  ),
+                  ListTile(
+                    key: const ValueKey('menu-delete'),
+                    leading: const Icon(Icons.delete_outline,
+                        color: AppColors.error),
+                    title: const Text(
+                      '게시글 삭제',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                    onTap: () => Navigator.pop(context, 'delete'),
+                  ),
+                ]
+              : [
+                  ListTile(
+                    leading: const Icon(Icons.flag_outlined),
+                    title: const Text('신고하기'),
+                    onTap: () => Navigator.pop(context, 'report'),
+                  ),
+                ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'status':
+        final status = await showTradeStatusSheet(context, item.tradeStatus);
+        if (status == null || !mounted) return;
+        await changeTradeStatus(context, ref, item, status);
+      case 'delete':
+        final deleted = await deleteFeedWithConfirm(context, ref, item);
+        if (deleted && mounted) context.go(RouteNames.home);
+      case 'report':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('신고 기능은 준비 중입니다.')),
+        );
+    }
   }
 
   Future<void> _onCta(FeedItem item) async {
@@ -133,8 +189,9 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                   },
                 ),
                 IconButton(
+                  key: const ValueKey('detail-more'),
                   icon: Icon(Icons.more_vert_rounded, color: iconColor),
-                  onPressed: () {},
+                  onPressed: () => _onMore(item),
                 ),
               ],
               flexibleSpace: FlexibleSpaceBar(
@@ -168,7 +225,24 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       style: AppTypography.bodyMedium,
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    Text(item.title, style: AppTypography.header1),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(item.title, style: AppTypography.header1),
+                        ),
+                        if (item.tradeStatus != TradeStatus.selling) ...[
+                          const SizedBox(width: AppSpacing.xs),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: TradeStatusBadge(
+                              key: const ValueKey('detail-trade-badge'),
+                              status: item.tradeStatus,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       item.description.isEmpty
@@ -196,6 +270,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                         const SizedBox(width: 4),
                         Text(
                           '관심 ${fav.likeCount > 0 || fav.isFavorite ? fav.likeCount : item.likeCount}',
+                          key: const ValueKey('detail-like-count'),
                           style: AppTypography.caption,
                         ),
                         const SizedBox(width: AppSpacing.lg),
@@ -222,8 +297,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
           priceOrCondition: item.priceOrCondition,
           ctaLabel: item.ctaButtonLabel,
           liked: fav.isFavorite,
-          onLikeToggle: () =>
-              ref.read(favoriteItemProvider(item.id).notifier).toggle(),
+          onLikeToggle: () => toggleFeedLike(context, ref, item.id),
           onCtaPressed: () => _onCta(item),
         ),
       ),

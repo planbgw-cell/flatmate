@@ -728,6 +728,101 @@ void main() {
     });
   });
 
+  group('likes · trade status · my lists', () {
+    test('POST/DELETE /feeds/{id}/like map LikeOut', () async {
+      final (api, adapter, _) = await _client(
+        (o) => (
+          200,
+          {
+            'feed_id': 7,
+            'is_liked': o.method == 'POST',
+            'like_count': o.method == 'POST' ? 3 : 2,
+          },
+        ),
+      );
+      final repo = DioFeedRepository(api);
+
+      final liked = await repo.toggleLike('7', currentlyLiked: false);
+      expect(adapter.requests.last.method, 'POST');
+      expect(adapter.requests.last.path, '/feeds/7/like');
+      expect(adapter.requests.last.headers['Authorization'], 'Bearer jwt-abc');
+      expect(liked, (isLiked: true, likeCount: 3));
+
+      final unliked = await repo.toggleLike('7', currentlyLiked: true);
+      expect(adapter.requests.last.method, 'DELETE');
+      expect(adapter.requests.last.path, '/feeds/7/like');
+      expect(unliked, (isLiked: false, likeCount: 2));
+    });
+
+    test('PATCH status · DELETE feed · FeedOut trade/like fields', () async {
+      final (api, adapter, _) = await _client((o) {
+        if (o.method == 'DELETE') return (204, null);
+        return (
+          200,
+          {
+            ..._feedOut(id: 7, title: '선풍기', publishedAt: '2026-10-22T00:00:00Z'),
+            'trade_status': 'RESERVED',
+            'like_count': 4,
+            'is_liked': true,
+          },
+        );
+      });
+      final repo = DioFeedRepository(api);
+
+      final updated = await repo.updateTradeStatus('7', TradeStatus.reserved);
+      expect(adapter.requests.last.method, 'PATCH');
+      expect(adapter.requests.last.path, '/feeds/7/status');
+      expect(adapter.requests.last.data, {'trade_status': 'RESERVED'});
+      expect(updated.tradeStatus, TradeStatus.reserved);
+      expect(updated.likeCount, 4);
+      expect(updated.isFavorite, isTrue);
+
+      await repo.deleteFeed('7');
+      expect(adapter.requests.last.method, 'DELETE');
+      expect(adapter.requests.last.path, '/feeds/7');
+    });
+
+    test('GET /users/me/feeds (trade_status filter) and /users/me/likes',
+        () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          200,
+          {
+            'total': 1,
+            'page': 1,
+            'limit': 50,
+            'items': [
+              {
+                ..._feedOut(id: 9, title: '내 글', publishedAt: '2026-10-22T00:00:00Z'),
+                'trade_status': 'COMPLETED',
+              },
+            ],
+          },
+        ),
+      );
+      final repo = DioFeedRepository(api);
+
+      final mine = await repo.getMyFeeds(status: TradeStatus.completed);
+      expect(adapter.requests.last.path, '/users/me/feeds');
+      expect(adapter.requests.last.queryParameters['trade_status'], 'COMPLETED');
+      expect(mine.single.tradeStatus, TradeStatus.completed);
+
+      await repo.getMyFeeds();
+      expect(
+        adapter.requests.last.queryParameters.containsKey('trade_status'),
+        isFalse,
+      );
+
+      await repo.getMyLikes();
+      expect(adapter.requests.last.path, '/users/me/likes');
+    });
+
+    test('missing trade_status defaults to SELLING', () {
+      expect(TradeStatus.fromCode(null), TradeStatus.selling);
+      expect(TradeStatus.fromCode('COMPLETED'), TradeStatus.completed);
+    });
+  });
+
   group('uploads', () {
     test('POST /uploads/images sends multipart files in order', () async {
       final dir = await Directory.systemTemp.createTemp('flatmate_upload');

@@ -86,7 +86,11 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
             : meta['price_or_condition']?.toString() ?? ''),
     thumbnailUrl: thumbnail,
     imageUrls: images,
-    likeCount: (meta['like_count'] as num?)?.toInt() ?? 0,
+    likeCount: (json['like_count'] as num?)?.toInt() ??
+        (meta['like_count'] as num?)?.toInt() ??
+        0,
+    isFavorite: json['is_liked'] as bool? ?? false,
+    tradeStatus: TradeStatus.fromCode(json['trade_status']),
     chatCount: (meta['chat_count'] as num?)?.toInt() ?? 0,
     category: category,
     badges: typed.isStructured ? typed.badges : legacyBadges,

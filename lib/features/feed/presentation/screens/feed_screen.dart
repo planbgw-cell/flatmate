@@ -13,6 +13,7 @@ import '../../../location/presentation/providers/location_provider.dart';
 import '../../../location/presentation/widgets/location_select_modal.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
+import '../feed_actions.dart';
 import '../providers/feed_provider.dart';
 import '../widgets/feed_card_item.dart';
 import '../widgets/feed_filter_bar.dart';
@@ -152,11 +153,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                   RouteNames.feedDetail,
                                   extra: item,
                                 ),
-                                onFavoriteToggle: () => ref
-                                    .read(
-                                      favoriteItemProvider(item.id).notifier,
-                                    )
-                                    .toggle(),
+                                onFavoriteToggle: () =>
+                                    toggleFeedLike(context, ref, item.id),
                               );
                             },
                           ),

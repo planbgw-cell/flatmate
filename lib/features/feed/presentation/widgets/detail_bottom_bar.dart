@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import 'like_heart.dart';
 
 class DetailBottomBar extends StatelessWidget {
   const DetailBottomBar({
@@ -40,19 +41,11 @@ class DetailBottomBar extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
+              key: const ValueKey('detail-like'),
               onPressed: onLikeToggle,
-              icon: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                transitionBuilder: (child, animation) {
-                  return ScaleTransition(scale: animation, child: child);
-                },
-                child: Icon(
-                  liked
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  key: ValueKey(liked),
-                  color: liked ? AppColors.primary : AppColors.textSecondary,
-                ),
+              icon: LikeHeart(
+                liked: liked,
+                inactiveColor: AppColors.textSecondary,
               ),
             ),
             Container(

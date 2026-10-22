@@ -67,7 +67,23 @@ class FeedRepositoryImpl implements FeedRepository {
   Future<FeedItem?> fetchById(String id) => _mock.fetchById(id);
 
   @override
-  Future<FeedItem> toggleFavorite(String id) => _mock.toggleFavorite(id);
+  Future<LikeResult> toggleLike(String id, {required bool currentlyLiked}) =>
+      _mock.toggleLike(id, currentlyLiked: currentlyLiked);
+
+  @override
+  Future<FeedItem> updateTradeStatus(String id, TradeStatus status) =>
+      _mock.updateTradeStatus(id, status);
+
+  @override
+  Future<void> deleteFeed(String id) => _mock.deleteFeed(id);
+
+  @override
+  Future<List<FeedItem>> getMyFeeds({TradeStatus? status, int page = 1}) =>
+      _mock.getMyFeeds(status: status, page: page);
+
+  @override
+  Future<List<FeedItem>> getMyLikes({int page = 1}) =>
+      _mock.getMyLikes(page: page);
 
   @override
   Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) =>

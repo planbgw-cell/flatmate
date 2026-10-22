@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
@@ -134,10 +136,29 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
         .toList();
     state = AsyncData(current.copyWith(items: next));
   }
+
+  void removeItem(String id) {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(
+      current.copyWith(
+        items: current.items.where((item) => item.id != id).toList(),
+      ),
+    );
+  }
 }
 
 final feedListProvider =
     AsyncNotifierProvider<FeedListNotifier, FeedListState>(FeedListNotifier.new);
+
+/// Bumped after like / trade-status / delete so other lists (마이페이지)
+/// refetch without the feed feature knowing about them.
+final feedMutationTickProvider = StateProvider<int>((ref) => 0);
+
+/// Server copies returned by author actions, for screens showing items that
+/// are not in the current feed page (e.g. opened from 마이페이지).
+final feedOverridesProvider =
+    StateProvider<Map<String, FeedItem>>((ref) => const {});
 
 class FavoriteInfo {
   const FavoriteInfo({required this.isFavorite, required this.likeCount});
@@ -181,14 +202,57 @@ class FavoriteItemNotifier extends Notifier<FavoriteInfo> {
     }
   }
 
+  /// Applies a like change made elsewhere (e.g. 관심목록) to this item.
+  void sync({required bool isLiked, required int likeCount}) {
+    state = FavoriteInfo(isFavorite: isLiked, likeCount: likeCount);
+    final listItem = ref
+        .read(feedListProvider)
+        .value
+        ?.items
+        .where((e) => e.id == itemId)
+        .firstOrNull;
+    if (listItem != null) {
+      ref.read(feedListProvider.notifier).patchItem(
+            listItem.copyWith(isFavorite: isLiked, likeCount: likeCount),
+          );
+    }
+  }
+
+  /// Optimistic: flips immediately, then syncs with `LikeOut` or rolls back.
   Future<void> toggle() async {
-    final updated =
-        await ref.read(feedRepositoryProvider).toggleFavorite(itemId);
+    final before = state;
+    final likedNext = !before.isFavorite;
     state = FavoriteInfo(
-      isFavorite: updated.isFavorite,
-      likeCount: updated.likeCount,
+      isFavorite: likedNext,
+      likeCount: math.max(0, before.likeCount + (likedNext ? 1 : -1)),
     );
-    ref.read(feedListProvider.notifier).patchItem(updated);
+    try {
+      final result = await ref
+          .read(feedRepositoryProvider)
+          .toggleLike(itemId, currentlyLiked: before.isFavorite);
+      final listItem = ref
+          .read(feedListProvider)
+          .value
+          ?.items
+          .where((e) => e.id == itemId)
+          .firstOrNull;
+      if (listItem != null) {
+        ref.read(feedListProvider.notifier).patchItem(
+              listItem.copyWith(
+                isFavorite: result.isLiked,
+                likeCount: result.likeCount,
+              ),
+            );
+      }
+      state = FavoriteInfo(
+        isFavorite: result.isLiked,
+        likeCount: result.likeCount,
+      );
+      ref.read(feedMutationTickProvider.notifier).state++;
+    } catch (_) {
+      state = before;
+      rethrow;
+    }
   }
 }
 
@@ -197,19 +261,21 @@ final favoriteItemProvider =
   FavoriteItemNotifier.new,
 );
 
-/// Latest feed item snapshot (list patch + detail extra seed).
+/// Latest feed item snapshot (author override → list patch → detail seed),
+/// with the live like state applied.
 final feedItemProvider = Provider.family<FeedItem, FeedItem>((ref, seed) {
+  final override = ref.watch(feedOverridesProvider)[seed.id];
   final list = ref.watch(feedListProvider).value;
   final fromList = list?.items.where((e) => e.id == seed.id).firstOrNull;
-  if (fromList != null) return fromList;
+  final base = override ?? fromList ?? seed;
 
   final fav = ref.watch(favoriteItemProvider(seed.id));
-  if (fav.isFavorite != seed.isFavorite ||
-      fav.likeCount != seed.likeCount && fav.likeCount != 0) {
-    return seed.copyWith(
+  if (fav.isFavorite != base.isFavorite ||
+      fav.likeCount != base.likeCount && fav.likeCount != 0) {
+    return base.copyWith(
       isFavorite: fav.isFavorite,
       likeCount: fav.likeCount,
     );
   }
-  return seed;
+  return base;
 });

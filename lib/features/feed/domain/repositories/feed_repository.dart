@@ -10,6 +10,9 @@ enum FeedSort {
   final String label;
 }
 
+/// Server like state after a toggle (`LikeOut`).
+typedef LikeResult = ({bool isLiked, int likeCount});
+
 /// Feed API contract — swap [MockFeedRepository] for a Dio/FastAPI impl later.
 abstract class FeedRepository {
   /// Paginated feed with category + geo filter.
@@ -34,8 +37,20 @@ abstract class FeedRepository {
   /// Single post detail by id.
   Future<FeedItem?> fetchById(String id);
 
-  /// Toggle favorite (관심) and return the updated item (likeCount synced).
-  Future<FeedItem> toggleFavorite(String id);
+  /// 관심 추가/해제 (`POST` / `DELETE /feeds/{id}/like`).
+  Future<LikeResult> toggleLike(String id, {required bool currentlyLiked});
+
+  /// Author only (`PATCH /feeds/{id}/status`).
+  Future<FeedItem> updateTradeStatus(String id, TradeStatus status);
+
+  /// Author only soft delete (`DELETE /feeds/{id}`).
+  Future<void> deleteFeed(String id);
+
+  /// 내 판매글 (`GET /users/me/feeds`), newest first.
+  Future<List<FeedItem>> getMyFeeds({TradeStatus? status, int page = 1});
+
+  /// 관심목록 (`GET /users/me/likes`), most recently liked first.
+  Future<List<FeedItem>> getMyLikes({int page = 1});
 
   /// Insert a newly created post (appears at top of subsequent fetches).
   /// [location] supplies the PostGIS point for geo queries.

@@ -10,6 +10,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../domain/models/feed_item.dart';
 import '../providers/feed_provider.dart';
+import 'like_heart.dart';
+import 'trade_status_badge.dart';
 
 class FeedCardItem extends ConsumerWidget {
   const FeedCardItem({
@@ -66,11 +68,28 @@ class FeedCardItem extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.titleMedium,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (item.tradeStatus != TradeStatus.selling) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: TradeStatusBadge(
+                            key: ValueKey('trade-badge-${item.id}'),
+                            status: item.tradeStatus,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.titleMedium,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
@@ -107,18 +126,28 @@ class FeedCardItem extends ConsumerWidget {
                         ),
                       ),
                       InkWell(
+                        key: ValueKey('feed-like-${item.id}'),
                         onTap: onFavoriteToggle,
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
                           padding: const EdgeInsets.all(4),
-                          child: _CountIcon(
-                            icon: liked
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border,
-                            count: likeCount,
-                            color: liked
-                                ? AppColors.primary
-                                : AppColors.textHint,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              LikeHeart(liked: liked, size: 16),
+                              if (likeCount > 0) ...[
+                                const SizedBox(width: 2),
+                                Text(
+                                  '$likeCount',
+                                  key: ValueKey('feed-like-count-${item.id}'),
+                                  style: AppTypography.caption.copyWith(
+                                    color: liked
+                                        ? AppColors.primary
+                                        : AppColors.textHint,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
@@ -157,27 +186,20 @@ class FeedCardItem extends ConsumerWidget {
 }
 
 class _CountIcon extends StatelessWidget {
-  const _CountIcon({
-    required this.icon,
-    required this.count,
-    this.color = AppColors.textHint,
-  });
+  const _CountIcon({required this.icon, required this.count});
 
   final IconData icon;
   final int count;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    if (count <= 0 && icon != Icons.favorite_rounded) {
-      return const SizedBox.shrink();
-    }
+    if (count <= 0) return const SizedBox.shrink();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        Icon(icon, size: 14, color: AppColors.textHint),
         const SizedBox(width: 2),
-        Text('$count', style: AppTypography.caption.copyWith(color: color)),
+        Text('$count', style: AppTypography.caption),
       ],
     );
   }

@@ -39,6 +39,20 @@ enum FeedBadge {
       };
 }
 
+/// 거래 상태 (`trade_status`). `selling` shows no badge.
+enum TradeStatus {
+  selling('SELLING', '판매중'),
+  reserved('RESERVED', '예약중'),
+  completed('COMPLETED', '거래완료');
+
+  const TradeStatus(this.code, this.label);
+  final String code;
+  final String label;
+
+  static TradeStatus fromCode(Object? code) =>
+      values.where((e) => e.code == code).firstOrNull ?? selling;
+}
+
 class FeedItem {
   const FeedItem({
     required this.id,
@@ -63,6 +77,7 @@ class FeedItem {
     this.detailMeta = const {},
     this.extraMeta = const {},
     this.isFavorite = false,
+    this.tradeStatus = TradeStatus.selling,
   });
 
   final String id;
@@ -90,7 +105,10 @@ class FeedItem {
 
   /// Server `extra_meta` (typed per category, see `FeedExtraMeta`).
   final Map<String, dynamic> extraMeta;
+
+  /// Signed-in user's like (`is_liked`); [likeCount] mirrors `like_count`.
   final bool isFavorite;
+  final TradeStatus tradeStatus;
 
   List<String> get gallery =>
       imageUrls.isEmpty ? [thumbnailUrl] : imageUrls;
@@ -139,6 +157,7 @@ class FeedItem {
     Map<String, String>? detailMeta,
     Map<String, dynamic>? extraMeta,
     bool? isFavorite,
+    TradeStatus? tradeStatus,
   }) {
     return FeedItem(
       id: id ?? this.id,
@@ -163,6 +182,7 @@ class FeedItem {
       detailMeta: detailMeta ?? this.detailMeta,
       extraMeta: extraMeta ?? this.extraMeta,
       isFavorite: isFavorite ?? this.isFavorite,
+      tradeStatus: tradeStatus ?? this.tradeStatus,
     );
   }
 }

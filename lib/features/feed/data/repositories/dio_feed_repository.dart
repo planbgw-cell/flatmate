@@ -5,17 +5,16 @@ import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
 import '../mappers/feed_item_mapper.dart';
 
-/// FastAPI feed repository (`/feeds`).
+/// FastAPI feed repository (`/feeds`, `/users/me/{feeds,likes}`).
 class DioFeedRepository implements FeedRepository {
   DioFeedRepository(this._api);
 
   final ApiClient _api;
 
-  /// Last known server copy per id (detail/favorite fallbacks).
-  final Map<String, FeedItem> _cache = {};
+  static const _myListLimit = 50;
 
-  /// Favorites are device-local until the server exposes a favorite API.
-  final Set<String> _favorites = {};
+  /// Last known server copy per id.
+  final Map<String, FeedItem> _cache = {};
 
   @override
   Future<List<FeedItem>> fetchFeeds({
@@ -90,20 +89,57 @@ class DioFeedRepository implements FeedRepository {
     }
   }
 
+  /// Both verbs are idempotent and answer `LikeOut{is_liked, like_count}`.
   @override
-  Future<FeedItem> toggleFavorite(String id) async {
-    final item = _cache[id] ?? await fetchById(id);
-    if (item == null) {
-      throw const ApiException(message: '게시글을 찾을 수 없습니다.', statusCode: 404);
-    }
-    final nowFavorite = !_favorites.contains(id);
-    nowFavorite ? _favorites.add(id) : _favorites.remove(id);
-    final updated = item.copyWith(
-      isFavorite: nowFavorite,
-      likeCount: (item.likeCount + (nowFavorite ? 1 : -1)).clamp(0, 1 << 31),
+  Future<LikeResult> toggleLike(
+    String id, {
+    required bool currentlyLiked,
+  }) async {
+    final path = '/feeds/$id/like';
+    final response = currentlyLiked
+        ? await _api.delete<dynamic>(path)
+        : await _api.post<dynamic>(path);
+    final data = _asMap(response.data);
+    return (
+      isLiked: data['is_liked'] as bool? ?? !currentlyLiked,
+      likeCount: (data['like_count'] as num?)?.toInt() ?? 0,
     );
-    _cache[id] = updated;
-    return updated;
+  }
+
+  @override
+  Future<FeedItem> updateTradeStatus(String id, TradeStatus status) async {
+    final response = await _api.patch<dynamic>(
+      '/feeds/$id/status',
+      data: {'trade_status': status.code},
+    );
+    return _remember(_asMap(response.data));
+  }
+
+  @override
+  Future<void> deleteFeed(String id) async {
+    await _api.delete<dynamic>('/feeds/$id');
+  }
+
+  @override
+  Future<List<FeedItem>> getMyFeeds({TradeStatus? status, int page = 1}) async {
+    final response = await _api.get<dynamic>(
+      '/users/me/feeds',
+      queryParameters: {
+        'trade_status': ?status?.code,
+        'page': page,
+        'limit': _myListLimit,
+      },
+    );
+    return _parseList(response.data);
+  }
+
+  @override
+  Future<List<FeedItem>> getMyLikes({int page = 1}) async {
+    final response = await _api.get<dynamic>(
+      '/users/me/likes',
+      queryParameters: {'page': page, 'limit': _myListLimit},
+    );
+    return _parseList(response.data);
   }
 
   @override
@@ -116,10 +152,7 @@ class DioFeedRepository implements FeedRepository {
   }
 
   FeedItem _remember(Map<String, dynamic> json) {
-    final parsed = feedItemFromJson(json);
-    final item = _favorites.contains(parsed.id)
-        ? parsed.copyWith(isFavorite: true, likeCount: parsed.likeCount + 1)
-        : parsed;
+    final item = feedItemFromJson(json);
     _cache[item.id] = item;
     return item;
   }
