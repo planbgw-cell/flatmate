@@ -3,7 +3,6 @@ import '../../../../core/auth/token_storage.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../feed/domain/models/feed_item.dart';
-import '../../../feed/domain/repositories/feed_repository.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -13,28 +12,27 @@ import '../mappers/chat_mapper.dart';
 
 /// FastAPI chat repository (`/chats/rooms…`, `/chats/ws/{room_id}`).
 class DioChatRepository implements ChatRepository {
-  DioChatRepository(this._api, this._tokens, this._refresher, this._feeds);
+  DioChatRepository(this._api, this._tokens, this._refresher);
 
   final ApiClient _api;
   final TokenStorage _tokens;
   final TokenRefresher _refresher;
-  final FeedRepository _feeds;
 
   final Map<String, ChatRoom> _rooms = {};
 
-  /// Product-header lookups, one request per feed for the session.
-  final Map<String, Future<FeedItem?>> _feedCache = {};
-
   String? get _me => _tokens.userId;
 
+  /// One request: `ChatRoomOut` already carries peer, last message, unread
+  /// count and the linked feed's title / thumbnail.
   @override
   Future<List<ChatRoom>> getChatRooms() async {
     final response = await _api.get<dynamic>('/chats/rooms');
     final raw = response.data is List ? response.data as List : const [];
-    final rooms = await Future.wait(
-      raw.whereType<Map>().map((e) => _toRoom(Map<String, dynamic>.from(e))),
-    );
-    rooms.sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
+    final rooms = raw
+        .whereType<Map>()
+        .map((e) => _toRoom(Map<String, dynamic>.from(e)))
+        .toList()
+      ..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
     return rooms;
   }
 
@@ -90,7 +88,6 @@ class DioChatRepository implements ChatRepository {
       throw const ApiException(message: '내가 쓴 글에는 채팅을 시작할 수 없어요.');
     }
     final feedId = int.tryParse(item.id);
-    if (feedId != null) _feedCache[item.id] = Future.value(item);
     final response = await _api.post<dynamic>(
       '/chats/rooms',
       data: {'peer_id': peerId, 'feed_id': ?feedId},
@@ -99,7 +96,8 @@ class DioChatRepository implements ChatRepository {
     if (data is! Map) {
       throw const ApiException(message: '채팅방 생성 응답 형식이 올바르지 않습니다.');
     }
-    return _toRoom(Map<String, dynamic>.from(data));
+    // The detail screen already has the price (not part of ChatRoomOut).
+    return _toRoom(Map<String, dynamic>.from(data), feed: item);
   }
 
   @override
@@ -117,14 +115,7 @@ class DioChatRepository implements ChatRepository {
     );
   }
 
-  Future<ChatRoom> _toRoom(Map<String, dynamic> json) async {
-    final feedId = json['feed_id']?.toString();
-    final feed = feedId == null
-        ? null
-        : await _feedCache.putIfAbsent(
-            feedId,
-            () => _feeds.fetchById(feedId).catchError((_) => null),
-          );
+  ChatRoom _toRoom(Map<String, dynamic> json, {FeedItem? feed}) {
     final room = chatRoomFromJson(json, feed: feed);
     _rooms[room.id] = room;
     return room;

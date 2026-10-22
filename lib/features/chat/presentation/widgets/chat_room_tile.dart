@@ -73,6 +73,18 @@ class ChatRoomTile extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (room.feedItemId.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      room.feedTitle,
+                      key: ValueKey('room-title-${room.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -120,6 +132,7 @@ class ChatRoomTile extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: CachedNetworkImage(
+                key: ValueKey('room-thumb-${room.id}'),
                 imageUrl: room.feedThumbnail,
                 width: 48,
                 height: 48,

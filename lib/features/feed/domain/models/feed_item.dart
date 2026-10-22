@@ -61,6 +61,7 @@ class FeedItem {
     this.ctaLabel = '채팅하기',
     this.verificationCount = 3,
     this.detailMeta = const {},
+    this.extraMeta = const {},
     this.isFavorite = false,
   });
 
@@ -86,6 +87,9 @@ class FeedItem {
   final String ctaLabel;
   final int verificationCount;
   final Map<String, String> detailMeta;
+
+  /// Server `extra_meta` (typed per category, see `FeedExtraMeta`).
+  final Map<String, dynamic> extraMeta;
   final bool isFavorite;
 
   List<String> get gallery =>
@@ -133,6 +137,7 @@ class FeedItem {
     String? ctaLabel,
     int? verificationCount,
     Map<String, String>? detailMeta,
+    Map<String, dynamic>? extraMeta,
     bool? isFavorite,
   }) {
     return FeedItem(
@@ -156,6 +161,7 @@ class FeedItem {
       ctaLabel: ctaLabel ?? this.ctaLabel,
       verificationCount: verificationCount ?? this.verificationCount,
       detailMeta: detailMeta ?? this.detailMeta,
+      extraMeta: extraMeta ?? this.extraMeta,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }

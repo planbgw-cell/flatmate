@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -37,19 +38,36 @@ class CreatePostScaffold extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('등록에 실패했습니다. $e')),
+        SnackBar(
+          content: Text(
+            e is ApiException ? '등록에 실패했습니다. ${e.message}' : '등록에 실패했습니다.',
+          ),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final submitting = ref.watch(createPostProvider).isLoading;
+    final phase = ref.watch(createPostProvider);
+    final submitting = phase != CreatePostPhase.idle;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(title, style: AppTypography.header2),
+        bottom: submitting
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(28),
+                child: Column(
+                  children: [
+                    Text(phase.label, style: AppTypography.caption),
+                    const SizedBox(height: 4),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
+                ),
+              )
+            : null,
         actions: [
           TextButton(
             onPressed: submitting ? null : () => _submit(context, ref),

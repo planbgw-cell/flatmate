@@ -14,6 +14,7 @@ import 'package:flatmate_app/core/auth/token_storage.dart';
 import 'package:flatmate_app/core/di/injection.dart';
 import 'package:flatmate_app/features/chat/data/datasources/chat_websocket_client.dart';
 import 'package:flatmate_app/features/chat/presentation/screens/chat_room_screen.dart';
+import 'package:flatmate_app/features/feed/presentation/screens/feed_screen.dart';
 import 'package:flatmate_app/features/location/presentation/widgets/location_select_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -79,6 +80,29 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await tester.tap(finder);
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+/// Seed posts sink pages deep as QA posts pile up at the same coordinates;
+/// scroll the feed (infinite scroll loads more) until [finder] is built.
+Future<void> _scrollFeedTo(WidgetTester tester, Finder finder) async {
+  final list = find.descendant(
+    of: find.byType(FeedScreen),
+    matching: find.byWidgetPredicate(
+      (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+    ),
+  );
+  for (var i = 0; i < 40; i++) {
+    await _pumpFor(tester, const Duration(milliseconds: 500));
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      await _pumpFor(tester, const Duration(milliseconds: 800));
+      return;
+    }
+    if (list.evaluate().isNotEmpty) {
+      await tester.drag(list.first, const Offset(0, -500));
+    }
+  }
+  throw TestFailure('Feed never showed $finder');
 }
 
 /// Second participant: REST + its own WebSocket, no UI.
@@ -161,11 +185,20 @@ void main() {
     await tester.enterText(form.at(3), nickname);
     await _tap(tester, find.text('다음'));
     await _pumpUntil(tester, find.text('현재 위치로 동네 찾기'));
-    await _tap(tester, find.text('현재 위치로 동네 찾기'));
-    await _pumpUntil(
-      tester,
-      find.byKey(const ValueKey('signup-selected-dong')),
-    );
+    // Indoors a cold GPS fix can time out once; the user would tap again.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await _tap(tester, find.text('현재 위치로 동네 찾기'));
+      try {
+        await _pumpUntil(
+          tester,
+          find.byKey(const ValueKey('signup-selected-dong')),
+          timeout: const Duration(seconds: 30),
+        );
+        break;
+      } on TestFailure {
+        if (attempt == 1) rethrow;
+      }
+    }
     await _tap(tester, find.text('가입 완료'));
     await _pumpUntil(tester, find.text('글쓰기'));
     expect(tokens.accessToken, startsWith('eyJ'));
@@ -198,7 +231,7 @@ void main() {
     await _pumpUntil(tester, find.text('성남시 분당구 정자동'));
     await _tap(tester, find.text('성남시 분당구 정자동'));
     await _tap(tester, find.byIcon(Icons.close));
-    await _pumpUntil(tester, find.textContaining(_sellerPost));
+    await _scrollFeedTo(tester, find.textContaining(_sellerPost));
     await _tap(tester, find.textContaining(_sellerPost));
     await _pumpUntil(tester, find.text('채팅으로 문의하기'));
     await _tap(tester, find.text('채팅으로 문의하기'));

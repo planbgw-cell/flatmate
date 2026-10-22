@@ -14,6 +14,7 @@ import '../../../chat/presentation/providers/chat_provider.dart';
 import '../../domain/models/feed_item.dart';
 import '../providers/feed_provider.dart';
 import '../widgets/author_profile_card.dart';
+import '../widgets/category_detail_card.dart';
 import '../widgets/detail_bottom_bar.dart';
 import '../widgets/detail_image_carousel.dart';
 
@@ -175,9 +176,10 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                           : item.description,
                       style: AppTypography.bodyLarge.copyWith(height: 1.55),
                     ),
-                    if (item.detailMeta.isNotEmpty) ...[
+                    if (item.detailMeta.isNotEmpty ||
+                        item.extraMeta.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.lg),
-                      _DetailMetaCard(meta: item.detailMeta),
+                      CategoryDetailCard(item: item),
                     ],
                     const SizedBox(height: AppSpacing.lg),
                     Row(
@@ -224,45 +226,6 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
               ref.read(favoriteItemProvider(item.id).notifier).toggle(),
           onCtaPressed: () => _onCta(item),
         ),
-      ),
-    );
-  }
-}
-
-class _DetailMetaCard extends StatelessWidget {
-  const _DetailMetaCard({required this.meta});
-
-  final Map<String, String> meta;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSpacing.xs),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          for (final entry in meta.entries) ...[
-            if (entry.key != meta.keys.first)
-              const SizedBox(height: AppSpacing.sm),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 96,
-                  child: Text(entry.key, style: AppTypography.bodyMedium),
-                ),
-                Expanded(
-                  child: Text(entry.value, style: AppTypography.bodyLarge),
-                ),
-              ],
-            ),
-          ],
-        ],
       ),
     );
   }

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../feed/domain/models/feed_item.dart';
+import '../../../feed/domain/models/feed_extra_meta.dart';
 import '../providers/create_post_provider.dart';
 import '../widgets/create_post_scaffold.dart';
 import '../widgets/image_picker_grid.dart';
 import '../widgets/post_form_fields.dart';
 
+/// 일반 / 중고 (`GENERAL`): is_free · can_negotiate. The server schema has no
+/// price field, so a price belongs in the body text.
 class GeneralCreateScreen extends ConsumerStatefulWidget {
   const GeneralCreateScreen({super.key});
 
@@ -21,56 +24,29 @@ class GeneralCreateScreen extends ConsumerStatefulWidget {
 class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
   final _title = TextEditingController();
   final _body = TextEditingController();
-  final _price = TextEditingController();
 
-  List<String> _images = [];
-  bool _offerEnabled = false;
-  bool _isSharing = false;
+  List<XFile> _images = [];
+  bool _isFree = false;
+  bool _canNegotiate = false;
 
   @override
   void dispose() {
     _title.dispose();
     _body.dispose();
-    _price.dispose();
     super.dispose();
   }
 
   CreatePostDraft _draft() {
-    final priceText = _isSharing
-        ? '나눔'
-        : (_price.text.trim().isEmpty
-            ? ''
-            : '${_format(_price.text.trim())}원');
-
-    final badges = <FeedBadge>[
-      FeedBadge.market,
-      if (_isSharing) FeedBadge.sharing,
-    ];
-
     return CreatePostDraft(
       kind: CreatePostKind.general,
       title: _title.text,
       description: _body.text,
-      priceOrCondition: priceText,
-      imageUrls: _images,
-      badges: badges,
-      detailMeta: {
-        '가격': priceText.isEmpty ? '-' : priceText,
-        '가격 제안': _offerEnabled ? '가능' : '불가',
-        '나눔': _isSharing ? '예' : '아니오',
+      images: _images,
+      extraMeta: {
+        ExtraMetaKeys.isFree: _isFree,
+        ExtraMetaKeys.canNegotiate: !_isFree && _canNegotiate,
       },
     );
-  }
-
-  String _format(String digits) {
-    if (digits.isEmpty) return digits;
-    final buf = StringBuffer();
-    for (var i = 0; i < digits.length; i++) {
-      final reverse = digits.length - i;
-      buf.write(digits[i]);
-      if (reverse > 1 && reverse % 3 == 1) buf.write(',');
-    }
-    return buf.toString();
   }
 
   @override
@@ -89,32 +65,31 @@ class _GeneralCreateScreenState extends ConsumerState<GeneralCreateScreen> {
           PostFormFields(
             titleController: _title,
             bodyController: _body,
-            priceController: _price,
-            priceLabel: '가격',
-            priceHint: '희망 가격',
-            showPrice: !_isSharing,
+            showPrice: false,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '판매 가격이 있다면 내용에 함께 적어 주세요.',
+            style: AppTypography.caption,
           ),
           const SizedBox(height: AppSpacing.md),
           CheckboxListTile(
+            key: const ValueKey('field-is-free'),
             contentPadding: EdgeInsets.zero,
             dense: true,
-            title: Text('가격 제안 받기', style: AppTypography.bodyLarge),
-            value: _offerEnabled,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: Text('나눔하기', style: AppTypography.bodyLarge),
+            value: _isFree,
             activeColor: AppColors.primary,
-            onChanged: (v) => setState(() => _offerEnabled = v ?? false),
+            onChanged: (v) => setState(() => _isFree = v ?? false),
           ),
-          CheckboxListTile(
+          SwitchListTile(
+            key: const ValueKey('field-can-negotiate'),
             contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text('나눔', style: AppTypography.bodyLarge),
-            value: _isSharing,
-            activeColor: AppColors.primary,
-            onChanged: (v) {
-              setState(() {
-                _isSharing = v ?? false;
-                if (_isSharing) _price.clear();
-              });
-            },
+            title: Text('가격 제안 받기', style: AppTypography.bodyLarge),
+            value: !_isFree && _canNegotiate,
+            activeThumbColor: AppColors.primary,
+            onChanged: _isFree ? null : (v) => setState(() => _canNegotiate = v),
           ),
           const SizedBox(height: AppSpacing.xxl),
         ],

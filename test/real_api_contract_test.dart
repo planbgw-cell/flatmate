@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -7,6 +8,9 @@ import 'package:flatmate_app/core/auth/token_refresher.dart';
 import 'package:flatmate_app/core/auth/token_storage.dart';
 import 'package:flatmate_app/core/network/api_client.dart';
 import 'package:flatmate_app/core/network/api_exception.dart';
+import 'package:flatmate_app/core/network/media_url.dart';
+import 'package:flatmate_app/features/post_create/data/image_upload_service.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flatmate_app/features/auth/data/repositories/dio_auth_repository.dart';
 import 'package:flatmate_app/features/chat/data/repositories/dio_chat_repository.dart';
 import 'package:flatmate_app/features/feed/data/repositories/dio_feed_repository.dart';
@@ -215,26 +219,47 @@ void main() {
       );
     });
 
-    test('POST /feeds carries Bearer JWT and FeedCreate body', () async {
+    test('POST /feeds carries Bearer JWT, image_urls and typed extra_meta',
+        () async {
+      const meta = {
+        'room_type': 'ONE_ROOM',
+        'deposit': 500,
+        'monthly_rent': 50,
+        'is_short_term': false,
+      };
       final (api, adapter, _) = await _client(
-        (o) => (201, _feedOut(id: 9, title: '알바 구해요', publishedAt: '2026-10-18T05:00:00Z', feedType: 'JOB', authorId: 7)),
+        (o) => (
+          201,
+          {
+            ..._feedOut(
+              id: 9,
+              title: '정자동 원룸',
+              publishedAt: '2026-10-18T05:00:00Z',
+              authorId: 7,
+            ),
+            'extra': null,
+            'extra_meta': meta,
+            'image_urls': ['/static/images/a.png', '/static/images/b.jpg'],
+            'thumbnail_url': '/static/images/a.png',
+          },
+        ),
       );
       final created = await DioFeedRepository(api).createPost(
         FeedItem(
           id: 'f-new-1',
-          title: '알바 구해요',
+          title: '정자동 원룸',
           neighborhood: '정자동',
           postedAt: DateTime.now(),
-          priceOrCondition: '시급 11,000원',
-          thumbnailUrl: 'https://picsum.photos/seed/x/400/400',
-          imageUrls: const ['https://picsum.photos/seed/x/800/600', '/local/a.jpg'],
+          priceOrCondition: '',
+          thumbnailUrl: '/static/images/a.png',
+          imageUrls: const ['/static/images/a.png', '/static/images/b.jpg'],
           likeCount: 0,
           chatCount: 0,
-          category: FeedCategory.job,
-          badges: const [FeedBadge.recruiting],
+          category: FeedCategory.housing,
+          badges: const [],
           isBumped: false,
-          description: '주말 오전',
-          authorName: '나의닉네임',
+          description: '역세권 원룸',
+          extraMeta: meta,
         ),
         location: _jeongja,
       );
@@ -243,18 +268,63 @@ void main() {
       expect(request.method, 'POST');
       expect(request.headers['Authorization'], 'Bearer jwt-abc');
       final body = request.data as Map<String, dynamic>;
-      expect(body['feed_type'], 'JOB');
-      expect(body['title'], '알바 구해요');
-      expect(body['content'], '주말 오전');
+      expect(body['feed_type'], 'REAL_ESTATE');
+      expect(body['content'], '역세권 원룸');
       expect(body['lat'], 37.3656);
-      expect(body['lng'], 127.1083);
       expect(body['address'], '성남시 분당구 정자동');
-      final extra = body['extra'] as Map<String, dynamic>;
-      expect(extra['price_or_condition'], '시급 11,000원');
-      expect(extra['author_nickname'], '나의닉네임');
-      expect(extra['image_urls'], ['https://picsum.photos/seed/x/800/600']);
+      expect(body['image_urls'], ['/static/images/a.png', '/static/images/b.jpg']);
+      expect(body['extra_meta'], meta);
+      expect(body.containsKey('extra'), isFalse);
+
       expect(created.id, '9');
-      expect(created.category, FeedCategory.job);
+      expect(created.imageUrls, [
+        'http://121.133.47.161:8000/static/images/a.png',
+        'http://121.133.47.161:8000/static/images/b.jpg',
+      ]);
+      expect(created.thumbnailUrl,
+          'http://121.133.47.161:8000/static/images/a.png');
+      expect(created.priceOrCondition, '보증금 500 / 월세 50');
+      expect(created.detailMeta['방 종류'], '원룸');
+      expect(created.detailMeta['보증금'], '500만원');
+      expect(created.badges, [FeedBadge.housing]);
+      expect(created.neighborhood, '정자동');
+    });
+
+    test('typed JOB / GENERAL extra_meta derive price labels', () async {
+      final (api, _, _) = await _client(
+        (_) => (
+          200,
+          {
+            'total': 2,
+            'page': 1,
+            'limit': 10,
+            'items': [
+              {
+                ..._feedOut(id: 4, title: '알바', publishedAt: '2026-10-18T05:00:00Z'),
+                'feed_type': 'JOB',
+                'extra': null,
+                'extra_meta': {
+                  'pay_type': 'HOURLY',
+                  'pay_amount': 11000,
+                  'work_days': '토,일',
+                  'work_hours': '09:00~13:00',
+                },
+              },
+              {
+                ..._feedOut(id: 5, title: '나눔', publishedAt: '2026-10-18T05:00:00Z'),
+                'feed_type': 'GENERAL',
+                'extra': null,
+                'extra_meta': {'is_free': true, 'can_negotiate': false},
+              },
+            ],
+          },
+        ),
+      );
+      final items = await DioFeedRepository(api).fetchFeeds(page: 1);
+      expect(items[0].priceOrCondition, '시급 11,000원');
+      expect(items[0].detailMeta['근무 요일'], '토·일');
+      expect(items[1].priceOrCondition, '나눔');
+      expect(items[1].badges, [FeedBadge.market, FeedBadge.sharing]);
     });
 
     test('non-numeric ids resolve to null without a request', () async {
@@ -509,8 +579,7 @@ void main() {
           ],
         );
       });
-      final feeds = DioFeedRepository(api);
-      final repo = DioChatRepository(api, tokens, _refresher, feeds);
+      final repo = DioChatRepository(api, tokens, _refresher);
       final feed = FeedItem(
         id: '1',
         title: '정자동 원룸',
@@ -562,7 +631,7 @@ void main() {
         ),
       );
       final repo =
-          DioChatRepository(api, tokens, _refresher, DioFeedRepository(api));
+          DioChatRepository(api, tokens, _refresher);
       final sent = await repo.sendMessage('5', '내일 볼 수 있을까요?');
       expect(adapter.requests.single.path, '/chats/rooms/5/messages');
       expect(adapter.requests.single.data, {'content': '내일 볼 수 있을까요?'});
@@ -583,7 +652,7 @@ void main() {
               for (final id in [1, 2])
                 {
                   'id': id,
-                  'feed_id': null,
+                  'feed_id': 100 + id,
                   'user_a_id': 7,
                   'user_b_id': 10 + id,
                   'peer_id': 10 + id,
@@ -591,6 +660,8 @@ void main() {
                   'last_message': '메시지$id',
                   'last_message_at': '2026-10-18T0$id:00:00Z',
                   'unread_count': id,
+                  'feed_title': '매물$id',
+                  'feed_thumbnail': '/static/images/room$id.png',
                   'created_at': '2026-10-18T00:00:00Z',
                 },
             ],
@@ -598,17 +669,62 @@ void main() {
         }
         return (404, null);
       });
-      final rooms = await DioChatRepository(
-        api,
-        tokens,
-        _refresher,
-        DioFeedRepository(api),
-      ).getChatRooms();
-      expect(adapter.requests, hasLength(1));
+      final rooms =
+          await DioChatRepository(api, tokens, _refresher).getChatRooms();
+      // Single request: no per-room /feeds/{id} lookups.
+      expect(adapter.requests.map((r) => r.path), ['/chats/rooms']);
       expect(rooms.map((r) => r.opponentName), ['이웃2', '이웃1']);
       expect(rooms.map((r) => r.unreadCount), [2, 1]);
       expect(rooms.first.lastMessage, '메시지2');
+      expect(rooms.first.feedTitle, '매물2');
+      expect(
+        rooms.first.feedThumbnail,
+        'http://121.133.47.161:8000/static/images/room2.png',
+      );
     });
+  });
+
+  group('uploads', () {
+    test('POST /uploads/images sends multipart files in order', () async {
+      final dir = await Directory.systemTemp.createTemp('flatmate_upload');
+      // Unread multipart streams keep the files open on Windows.
+      addTearDown(() => dir.delete(recursive: true).catchError((_) => dir));
+      final png = File('${dir.path}/a.png')..writeAsBytesSync([1, 2, 3]);
+      final heic = File('${dir.path}/b')..writeAsBytesSync([4, 5]);
+
+      final (api, adapter, _) = await _client(
+        (_) => (200, ['/static/images/x.png', '/static/images/y.jpg']),
+      );
+      final urls = await DioImageUploadService(api)
+          .upload([XFile(png.path), XFile(heic.path)]);
+
+      final request = adapter.requests.single;
+      expect(request.path, '/uploads/images');
+      expect(request.headers['Authorization'], 'Bearer jwt-abc');
+      final form = request.data as FormData;
+      expect(form.files.map((f) => f.key), ['files', 'files']);
+      expect(form.files.map((f) => f.value.filename), ['a.png', 'b.jpg']);
+      expect(
+        form.files.map((f) => f.value.contentType?.mimeType),
+        ['image/png', 'image/jpeg'],
+      );
+      expect(urls, ['/static/images/x.png', '/static/images/y.jpg']);
+    });
+
+    test('no photos → no request', () async {
+      final (api, adapter, _) = await _client((_) => (200, const []));
+      expect(await DioImageUploadService(api).upload(const []), isEmpty);
+      expect(adapter.requests, isEmpty);
+    });
+  });
+
+  test('resolveMediaUrl keeps absolute URLs and prefixes relative ones', () {
+    expect(
+      resolveMediaUrl('/static/images/a.png', apiBaseUrl: 'http://h:8000/api/v1'),
+      'http://h:8000/static/images/a.png',
+    );
+    expect(resolveMediaUrl('https://cdn/x.png'), 'https://cdn/x.png');
+    expect(resolveMediaUrl(null), '');
   });
 
   test('GET /feeds forwards sort (distance needs coordinates)', () async {

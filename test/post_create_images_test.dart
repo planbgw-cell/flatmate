@@ -1,0 +1,226 @@
+import 'package:flatmate_app/core/auth/token_storage.dart';
+import 'package:flatmate_app/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:flatmate_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flatmate_app/features/feed/data/repositories/mock_feed_repository.dart';
+import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
+import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
+import 'package:flatmate_app/features/location/domain/models/location_item.dart';
+import 'package:flatmate_app/features/post_create/data/image_picker_service.dart';
+import 'package:flatmate_app/features/post_create/data/image_upload_service.dart';
+import 'package:flatmate_app/features/post_create/presentation/providers/create_post_provider.dart';
+import 'package:flatmate_app/features/post_create/presentation/screens/real_estate_create_screen.dart';
+import 'package:flatmate_app/features/post_create/presentation/widgets/image_picker_grid.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+
+class _FakePicker extends PostImagePicker {
+  _FakePicker(this.galleryCount);
+
+  final int galleryCount;
+  int? lastLimit;
+
+  @override
+  Future<List<XFile>> pickFromGallery({required int limit}) async {
+    lastLimit = limit;
+    return [for (var i = 0; i < galleryCount; i++) XFile('/fake/photo$i.png')];
+  }
+
+  @override
+  Future<XFile?> pickFromCamera() async => XFile('/fake/camera.jpg');
+}
+
+class _RecordingUpload implements ImageUploadService {
+  List<XFile>? uploaded;
+
+  @override
+  Future<List<String>> upload(List<XFile> images) async {
+    uploaded = images;
+    return [for (var i = 0; i < images.length; i++) '/static/images/u$i.png'];
+  }
+}
+
+class _RecordingFeeds extends MockFeedRepository {
+  FeedItem? created;
+
+  @override
+  Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) async {
+    created = item;
+    return item;
+  }
+}
+
+void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+
+  testWidgets('grid: gallery pick · 대표 badge · delete · make cover · max 10',
+      (tester) async {
+    final picker = _FakePicker(3);
+    var images = <XFile>[];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [postImagePickerProvider.overrideWithValue(picker)],
+        child: MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ImagePickerGrid(
+                images: images,
+                onChanged: (next) => setState(() => images = next),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('0/10'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('image-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('앨범에서 선택'));
+    await tester.pumpAndSettle();
+
+    expect(picker.lastLimit, 10);
+    expect(images.map((e) => e.path), [
+      '/fake/photo0.png',
+      '/fake/photo1.png',
+      '/fake/photo2.png',
+    ]);
+    expect(find.text('3/10'), findsOneWidget);
+    expect(find.text('대표'), findsOneWidget);
+
+    // X on the first photo → next one becomes 대표.
+    await tester.tap(find.byKey(const ValueKey('image-remove-0')));
+    await tester.pumpAndSettle();
+    expect(images.map((e) => e.path), ['/fake/photo1.png', '/fake/photo2.png']);
+
+    // Tap → "대표 사진으로 설정" moves it to the front.
+    await tester.tap(find.byKey(const ValueKey('image-thumb-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('대표 사진으로 설정'));
+    await tester.pumpAndSettle();
+    expect(images.map((e) => e.path), ['/fake/photo2.png', '/fake/photo1.png']);
+
+    // Over-pick is clamped to 10.
+    images = [for (var i = 0; i < 8; i++) XFile('/fake/x$i.png')];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [postImagePickerProvider.overrideWithValue(_FakePicker(5))],
+        child: MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) => ImagePickerGrid(
+                images: images,
+                onChanged: (next) => setState(() => images = next),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('image-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('앨범에서 선택'));
+    await tester.pumpAndSettle();
+    expect(images, hasLength(10));
+  });
+
+  testWidgets('real-estate form uploads photos then posts typed extra_meta',
+      (tester) async {
+    tester.view
+      ..physicalSize = const Size(1080, 2400)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    final upload = _RecordingUpload();
+    final feeds = _RecordingFeeds();
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => const Scaffold(body: Text('홈'))),
+        GoRoute(
+          path: '/create',
+          builder: (_, _) => const RealEstateCreateScreen(),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          postImagePickerProvider.overrideWithValue(_FakePicker(2)),
+          imageUploadServiceProvider.overrideWithValue(upload),
+          feedRepositoryProvider.overrideWithValue(feeds),
+          tokenStorageProvider.overrideWithValue(TokenStorage()),
+          authRepositoryProvider.overrideWithValue(MockAuthRepository()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    router.push('/create');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('image-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('앨범에서 선택'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const ValueKey('post-title')), '정자동 원룸');
+    await tester.enterText(find.byKey(const ValueKey('post-body')), '역세권');
+    await tester.tap(find.text('투룸'));
+    await tester.enterText(find.byKey(const ValueKey('field-deposit')), '500');
+    await tester.enterText(
+      find.byKey(const ValueKey('field-monthly-rent')),
+      '50',
+    );
+    await tester.tap(find.byKey(const ValueKey('field-short-term')));
+    await tester.pump();
+
+    await tester.tap(find.text('완료'));
+    await tester.pumpAndSettle();
+
+    expect(upload.uploaded?.map((e) => e.path),
+        ['/fake/photo0.png', '/fake/photo1.png']);
+    final item = feeds.created!;
+    expect(item.category, FeedCategory.housing);
+    expect(item.imageUrls, ['/static/images/u0.png', '/static/images/u1.png']);
+    expect(item.extraMeta, {
+      'room_type': 'TWO_ROOM',
+      'deposit': 500,
+      'monthly_rent': 50,
+      'is_short_term': true,
+    });
+    expect(item.priceOrCondition, '보증금 500 / 월세 50');
+    expect(find.text('홈'), findsOneWidget);
+  });
+
+  testWidgets('missing rent is rejected before any upload', (tester) async {
+    final upload = _RecordingUpload();
+    final router = GoRouter(
+      initialLocation: '/create',
+      routes: [
+        GoRoute(
+          path: '/create',
+          builder: (_, _) => const RealEstateCreateScreen(),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          imageUploadServiceProvider.overrideWithValue(upload),
+          feedRepositoryProvider.overrideWithValue(_RecordingFeeds()),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('post-title')), '정자동 원룸');
+    await tester.enterText(find.byKey(const ValueKey('post-body')), '역세권');
+    await tester.enterText(find.byKey(const ValueKey('field-deposit')), '500');
+    await tester.tap(find.text('완료'));
+    await tester.pump();
+    expect(find.text('월세를 입력해 주세요.'), findsOneWidget);
+    expect(upload.uploaded, isNull);
+  });
+}

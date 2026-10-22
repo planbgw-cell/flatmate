@@ -35,6 +35,7 @@ class DetailImageCarousel extends StatelessWidget {
               return Container(color: AppColors.border);
             }
             return CachedNetworkImage(
+              key: ValueKey('detail-image-$i'),
               imageUrl: url,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(color: AppColors.border),
@@ -42,12 +43,15 @@ class DetailImageCarousel extends StatelessWidget {
             );
           },
         ),
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.center,
-              colors: [Color(0x66000000), Colors.transparent],
+        // Decorations hit-test; without this the overlay swallows swipes.
+        const IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.center,
+                colors: [Color(0x66000000), Colors.transparent],
+              ),
             ),
           ),
         ),

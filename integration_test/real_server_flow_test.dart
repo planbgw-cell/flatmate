@@ -79,6 +79,37 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+/// Seed posts sink pages deep as QA posts pile up at the same coordinates;
+/// scroll the feed (infinite scroll loads more) until [finder] is built.
+Future<void> _scrollFeedTo(
+  WidgetTester tester,
+  Finder finder, {
+  bool backToTop = false,
+}) async {
+  final list = find.descendant(
+    of: find.byType(FeedScreen),
+    matching: find.byWidgetPredicate(
+      (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+    ),
+  );
+  for (var i = 0; i < 40; i++) {
+    await _pumpFor(tester, const Duration(milliseconds: 500));
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      if (backToTop) {
+        // Scrolling down hides the 글쓰기 FAB; flick back up to restore it.
+        await tester.fling(list.first, const Offset(0, 4000), 6000);
+      }
+      await _pumpFor(tester, const Duration(milliseconds: 800));
+      return;
+    }
+    if (list.evaluate().isNotEmpty) {
+      await tester.drag(list.first, const Offset(0, -500));
+    }
+  }
+  throw TestFailure('Feed never showed $finder');
+}
+
 ProviderContainer _container(WidgetTester tester) =>
     ProviderScope.containerOf(tester.element(find.byType(FeedScreen)));
 
@@ -100,23 +131,25 @@ Future<void> _selectDong(
   await _pumpFor(tester, const Duration(milliseconds: 600));
 }
 
+/// [fields]: form field key (`post-title`, `field-deposit`, …) → text.
 Future<void> _createPost(
   WidgetTester tester, {
   required String menu,
-  required List<String> fields,
+  required Map<String, String> fields,
 }) async {
   await _tap(tester, find.text('글쓰기'));
   await _pumpUntil(tester, find.text('무엇을 올릴까요?'));
   await _tap(tester, find.text(menu));
   await _pumpUntil(tester, find.text('완료'));
-  final inputs = find.byType(TextField);
-  for (var i = 0; i < fields.length; i++) {
-    await tester.enterText(inputs.at(i), fields[i]);
+  for (final entry in fields.entries) {
+    final field = find.byKey(ValueKey(entry.key));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, entry.value);
     await tester.pump();
   }
   await _tap(tester, find.text('완료'));
   await _pumpUntil(tester, find.text('게시글이 등록되었습니다.'));
-  await _pumpUntil(tester, find.textContaining(fields.first));
+  await _pumpUntil(tester, find.textContaining(fields['post-title']!));
 }
 
 Dio _rawDio() => Dio(BaseOptions(baseUrl: AppConfig.devServerBaseUrl));
@@ -157,11 +190,20 @@ void main() {
     await tester.enterText(form.at(3), nickname);
     await _tap(tester, find.text('다음'));
     await _pumpUntil(tester, find.text('현재 위치로 동네 찾기'));
-    await _tap(tester, find.text('현재 위치로 동네 찾기'));
-    await _pumpUntil(
-      tester,
-      find.byKey(const ValueKey('signup-selected-dong')),
-    );
+    // Indoors a cold GPS fix can time out once; the user would tap again.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await _tap(tester, find.text('현재 위치로 동네 찾기'));
+      try {
+        await _pumpUntil(
+          tester,
+          find.byKey(const ValueKey('signup-selected-dong')),
+          timeout: const Duration(seconds: 30),
+        );
+        break;
+      } on TestFailure {
+        if (attempt == 1) rethrow;
+      }
+    }
     await _tap(tester, find.text('가입 완료'));
     await _pumpUntil(tester, find.text('글쓰기'));
 
@@ -176,7 +218,11 @@ void main() {
 
     // 2) 동네: 정자동 → seller post visible.
     await _selectDong(tester, query: '정자', fullName: '성남시 분당구 정자동');
-    await _pumpUntil(tester, find.textContaining(_sellerJeongjaPost));
+    await _scrollFeedTo(
+      tester,
+      find.textContaining(_sellerJeongjaPost),
+      backToTop: true,
+    );
     _step('정자동 선택 → 반경 3km 피드에 "$_sellerJeongjaPost" 노출');
 
     // 3) 동네: 청룡동(서울대입구역) → only nearby posts.
@@ -187,7 +233,11 @@ void main() {
 
     // Back to 정자동 for posting + chat.
     await _selectDong(tester, query: '정자', fullName: '성남시 분당구 정자동');
-    await _pumpUntil(tester, find.textContaining(_sellerJeongjaPost));
+    await _scrollFeedTo(
+      tester,
+      find.textContaining(_sellerJeongjaPost),
+      backToTop: true,
+    );
 
     // 4) 게시글 3종 등록 → top of feed + DB row.
     final dio = _rawDio();
@@ -205,7 +255,12 @@ void main() {
     await _createPost(
       tester,
       menu: '부동산 / 주거 등록',
-      fields: [housingTitle, '실서버 통합 테스트 매물입니다.', '500', '60'],
+      fields: {
+        'post-title': housingTitle,
+        'post-body': '실서버 통합 테스트 매물입니다.',
+        'field-deposit': '500',
+        'field-monthly-rent': '60',
+      },
     );
     await verifyTop(housingTitle, 'REAL_ESTATE');
 
@@ -213,7 +268,11 @@ void main() {
     await _createPost(
       tester,
       menu: '알바 공고 등록',
-      fields: [jobTitle, '토·일 오전 근무, 실서버 테스트.', '11000'],
+      fields: {
+        'post-title': jobTitle,
+        'post-body': '토·일 오전 근무, 실서버 테스트.',
+        'field-pay-amount': '11000',
+      },
     );
     await verifyTop(jobTitle, 'JOB');
 
@@ -221,14 +280,17 @@ void main() {
     await _createPost(
       tester,
       menu: '일반글 작성',
-      fields: [generalTitle, '실서버 일반글 테스트.', '5000'],
+      fields: {
+        'post-title': generalTitle,
+        'post-body': '실서버 일반글 테스트. 가격 5,000원',
+      },
     );
     await verifyTop(generalTitle, 'GENERAL');
     _step('부동산/알바/일반 등록 → DB 삽입 + 피드 최상단 노출 (${created.join(', ')})');
 
     // 5) 상세 → 채팅으로 문의하기 → 1:1 room → send / receive.
     await _tap(tester, find.text('부동산/주거'));
-    await _pumpUntil(tester, find.textContaining(_sellerJeongjaPost));
+    await _scrollFeedTo(tester, find.textContaining(_sellerJeongjaPost));
     await _tap(tester, find.textContaining(_sellerJeongjaPost));
     await _pumpUntil(tester, find.text('채팅으로 문의하기'));
     await _tap(tester, find.text('채팅으로 문의하기'));

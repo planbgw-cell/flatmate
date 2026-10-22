@@ -1,4 +1,6 @@
+import '../../../../core/network/media_url.dart';
 import '../../../location/domain/models/location_item.dart';
+import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
 
 /// App category ↔ FastAPI `feed_type` enum.
@@ -22,39 +24,46 @@ FeedCategory categoryForFeedType(String? feedType) {
   return FeedCategory.community;
 }
 
-/// `FeedOut` → [FeedItem]. UI-only fields travel in the free-form `extra` map.
+List<String> _stringList(Object? raw) => raw is List
+    ? raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
+    : const [];
+
+/// `FeedOut` → [FeedItem].
+///
+/// Structured posts carry typed `extra_meta` (see [ExtraMetaKeys]); posts
+/// written before the schema change still hold display keys there
+/// (`price_or_condition`, `detail_meta`, `neighborhood`, …).
 FeedItem feedItemFromJson(Map<String, dynamic> json) {
-  final extraRaw = json['extra'];
-  final extra = extraRaw is Map
-      ? Map<String, dynamic>.from(extraRaw)
+  final metaRaw = json['extra_meta'] ?? json['extra'];
+  final meta = metaRaw is Map
+      ? Map<String, dynamic>.from(metaRaw)
       : const <String, dynamic>{};
+  final category = categoryForFeedType(json['feed_type']?.toString());
+  final typed = FeedExtraMeta(category, meta);
 
-  final images = (extra['image_urls'] as List?)
-          ?.map((e) => e.toString())
-          .where((e) => e.isNotEmpty)
-          .toList() ??
-      const <String>[];
+  var images = _stringList(json['image_urls']);
+  if (images.isEmpty) images = _stringList(meta['image_urls']);
+  images = images.map(resolveMediaUrl).toList();
+  final thumbnail = resolveMediaUrl(
+    json['thumbnail_url']?.toString() ??
+        (images.isNotEmpty ? images.first : meta['thumbnail_url']?.toString()),
+  );
 
-  final badgeNames = (extra['badges'] as List?) ?? const [];
-  final badges = <FeedBadge>[
-    for (final b in badgeNames)
+  final legacyBadges = <FeedBadge>[
+    for (final b in (meta['badges'] as List?) ?? const [])
       ...FeedBadge.values.where((e) => e.name == b.toString()),
   ];
-
-  final detailMeta = <String, String>{};
-  final metaRaw = extra['detail_meta'];
-  if (metaRaw is Map) {
-    metaRaw.forEach((key, value) {
-      detailMeta[key.toString()] = value.toString();
+  final legacyDetail = <String, String>{};
+  final legacyDetailRaw = meta['detail_meta'];
+  if (legacyDetailRaw is Map) {
+    legacyDetailRaw.forEach((key, value) {
+      legacyDetail[key.toString()] = value.toString();
     });
   }
 
   final address = json['address']?.toString() ?? '';
-  final neighborhood = extra['neighborhood']?.toString() ??
+  final neighborhood = meta['neighborhood']?.toString() ??
       (address.isEmpty ? '' : address.split(' ').last);
-
-  final thumbnail = extra['thumbnail_url']?.toString() ??
-      (images.isNotEmpty ? images.first : '');
 
   final postedAt = DateTime.tryParse(json['published_at']?.toString() ?? '') ??
       DateTime.tryParse(json['created_at']?.toString() ?? '') ??
@@ -65,27 +74,33 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
     title: json['title']?.toString() ?? '',
     neighborhood: neighborhood,
     postedAt: postedAt.toLocal(),
-    priceOrCondition: extra['price_or_condition']?.toString() ?? '',
+    priceOrCondition: typed.isStructured
+        ? typed.priceLabel
+        : meta['price_or_condition']?.toString() ?? '',
     thumbnailUrl: thumbnail,
     imageUrls: images,
-    likeCount: (extra['like_count'] as num?)?.toInt() ?? 0,
-    chatCount: (extra['chat_count'] as num?)?.toInt() ?? 0,
-    category: categoryForFeedType(json['feed_type']?.toString()),
-    badges: badges,
-    isBumped: extra['is_bumped'] as bool? ?? false,
+    likeCount: (meta['like_count'] as num?)?.toInt() ?? 0,
+    chatCount: (meta['chat_count'] as num?)?.toInt() ?? 0,
+    category: category,
+    badges: typed.isStructured ? typed.badges : legacyBadges,
+    isBumped: meta['is_bumped'] as bool? ?? false,
     description: json['content']?.toString() ?? '',
-    authorName: extra['author_nickname']?.toString() ?? '이웃',
+    authorName: meta['author_nickname']?.toString() ?? '이웃',
     authorId: json['author_id']?.toString(),
-    ctaLabel: extra['cta_label']?.toString() ?? '채팅하기',
-    detailMeta: detailMeta,
+    ctaLabel: meta['cta_label']?.toString() ??
+        (category == FeedCategory.job ? '지원하기' : '채팅하기'),
+    detailMeta: typed.isStructured
+        ? {for (final row in typed.rows) row.label: row.value}
+        : legacyDetail,
+    extraMeta: meta,
   );
 }
 
 /// [FeedItem] → `FeedCreate` body for `POST /feeds`.
+///
+/// [FeedItem.imageUrls] must hold the URLs returned by `POST /uploads/images`;
+/// `extra_meta` only accepts the per-type keys (no display helpers).
 Map<String, dynamic> feedCreateToJson(FeedItem item, {LocationItem? location}) {
-  // Only remote URLs are shareable; local picks need an upload API first.
-  final remoteImages =
-      item.imageUrls.where((url) => url.startsWith('http')).toList();
   return {
     'feed_type': _feedTypeByCategory[item.category] ?? 'GENERAL',
     'title': item.title,
@@ -93,16 +108,7 @@ Map<String, dynamic> feedCreateToJson(FeedItem item, {LocationItem? location}) {
     if (location != null) 'lat': location.latitude,
     if (location != null) 'lng': location.longitude,
     if (location != null) 'address': location.fullName,
-    'extra': {
-      'neighborhood': item.neighborhood,
-      'price_or_condition': item.priceOrCondition,
-      if (item.thumbnailUrl.startsWith('http'))
-        'thumbnail_url': item.thumbnailUrl,
-      'image_urls': remoteImages,
-      'badges': item.badges.map((b) => b.name).toList(),
-      'detail_meta': item.detailMeta,
-      'cta_label': item.ctaLabel,
-      'author_nickname': item.authorName,
-    },
+    'image_urls': item.imageUrls,
+    'extra_meta': item.extraMeta,
   };
 }

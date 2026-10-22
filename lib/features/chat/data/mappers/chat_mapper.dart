@@ -1,20 +1,23 @@
+import '../../../../core/network/media_url.dart';
 import '../../../feed/domain/models/feed_item.dart';
 import '../../domain/models/chat_message.dart';
 import '../../domain/models/chat_room.dart';
 
-/// `ChatRoomOut` → [ChatRoom]. Peer, last message and unread count come from
-/// the API; [feed] only fills the product header (title / price / thumbnail).
+/// `ChatRoomOut` → [ChatRoom]. Everything comes from the API; an optional
+/// [feed] (known when opening from a detail screen) adds the price, which
+/// `ChatRoomOut` does not carry.
 ChatRoom chatRoomFromJson(Map<String, dynamic> json, {FeedItem? feed}) {
   final createdAt =
       DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now();
   final lastAt = DateTime.tryParse(json['last_message_at']?.toString() ?? '');
+  final thumbnail = resolveMediaUrl(json['feed_thumbnail']?.toString());
 
   return ChatRoom(
     id: json['id']?.toString() ?? '',
     feedItemId: json['feed_id']?.toString() ?? '',
-    feedTitle: feed?.title ?? '이웃과의 대화',
+    feedTitle: json['feed_title']?.toString() ?? feed?.title ?? '이웃과의 대화',
     feedPrice: feed?.priceOrCondition ?? '',
-    feedThumbnail: feed?.thumbnailUrl ?? '',
+    feedThumbnail: thumbnail.isNotEmpty ? thumbnail : feed?.thumbnailUrl ?? '',
     opponentName: json['peer_nickname']?.toString() ?? '이웃',
     opponentProfileImage: json['peer_profile_image']?.toString(),
     opponentNeighborhood: feed?.neighborhood ?? '',

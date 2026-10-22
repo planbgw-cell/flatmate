@@ -31,6 +31,7 @@ class PostFormFields extends StatelessWidget {
         Text('제목', style: AppTypography.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         TextField(
+          key: const ValueKey('post-title'),
           controller: titleController,
           style: AppTypography.bodyLarge,
           decoration: _decoration(hint: '제목을 입력하세요 (2자 이상)'),
@@ -39,6 +40,7 @@ class PostFormFields extends StatelessWidget {
         Text('내용', style: AppTypography.titleMedium),
         const SizedBox(height: AppSpacing.xs),
         TextField(
+          key: const ValueKey('post-body'),
           controller: bodyController,
           style: AppTypography.bodyLarge.copyWith(height: 1.5),
           minLines: 5,
@@ -127,6 +129,41 @@ class SelectableChipRow extends StatelessWidget {
             backgroundColor: AppColors.background,
           ),
       ],
+    );
+  }
+}
+
+/// Digits-only amount input with a unit suffix (e.g. "만원", "원").
+class NumberField extends StatelessWidget {
+  const NumberField({
+    super.key,
+    required this.controller,
+    required this.label,
+    required this.suffix,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String suffix;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: AppTypography.bodyLarge,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: AppTypography.bodyMedium,
+        suffixText: suffix,
+        filled: true,
+        fillColor: AppColors.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      ),
     );
   }
 }
