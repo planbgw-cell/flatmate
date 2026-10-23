@@ -12,6 +12,7 @@ abstract final class RouteNames {
   static const propertyDetail = '/property/:id';
   static const jobs = '/jobs';
   static const localLife = '/local-life';
+  static const search = '/search';
   static const myPage = '/mypage';
   static const blockedUsers = '/mypage/blocked';
   static const postCreateRealEstate = '/post/create/real-estate';

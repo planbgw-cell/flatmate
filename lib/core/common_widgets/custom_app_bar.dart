@@ -53,6 +53,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           actions: [
             IconButton(
+              key: const ValueKey('feed-search-button'),
               icon: const Icon(
                 Icons.search,
                 color: AppColors.textPrimary,

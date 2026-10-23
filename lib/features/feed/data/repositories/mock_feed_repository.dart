@@ -198,6 +198,31 @@ class MockFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<List<FeedItem>> searchFeeds({
+    required String query,
+    int page = 1,
+    int pageSize = 20,
+    LocationItem? location,
+    double radiusKm = 3,
+  }) async {
+    await _delay();
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty || page < 1) return const [];
+    final matches = _catalog()
+        .where((item) => !item.id.contains('-p'))
+        .where((item) => !_deleted.contains(item.id))
+        .where((item) => _withinRadius(item, location, radiusKm))
+        .where(
+          (item) =>
+              item.title.toLowerCase().contains(needle) ||
+              item.description.toLowerCase().contains(needle),
+        )
+        .map(_withFavorite)
+        .toList();
+    return matches.skip((page - 1) * pageSize).take(pageSize).toList();
+  }
+
+  @override
   Future<FeedItem?> fetchById(String id) async {
     await _delay();
     _ensureSeed();

@@ -107,6 +107,29 @@ class DioFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<List<FeedItem>> searchFeeds({
+    required String query,
+    int page = 1,
+    int pageSize = 20,
+    LocationItem? location,
+    double radiusKm = 3,
+  }) async {
+    final response = await _api.get<dynamic>(
+      '/feeds',
+      queryParameters: {
+        'q': query,
+        'page': page,
+        'limit': pageSize,
+        if (location != null) 'lat': location.latitude,
+        if (location != null) 'lng': location.longitude,
+        if (location != null) 'radius_m': (radiusKm * 1000).round(),
+        'sort': FeedSort.latest.name,
+      },
+    );
+    return _parseList(response.data);
+  }
+
+  @override
   Future<FeedItem> updateFeed(
     String id, {
     required String title,

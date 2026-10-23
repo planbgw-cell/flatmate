@@ -55,20 +55,10 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
 
   FeedRepository get _repo => ref.read(feedRepositoryProvider);
 
-  /// The server may not filter blocked authors out of `GET /feeds`.
-  Future<Set<String>> _blockedAuthors() async {
-    try {
-      final users = await ref.read(blockedUsersProvider.future);
-      return {for (final user in users) user.userId};
-    } catch (_) {
-      return const {};
-    }
-  }
+  Future<Set<String>> _blockedAuthors() => readBlockedAuthorIds(ref);
 
   static List<FeedItem> _visible(List<FeedItem> items, Set<String> blocked) =>
-      blocked.isEmpty
-          ? items
-          : items.where((e) => !blocked.contains(e.authorId)).toList();
+      withoutBlockedAuthors(items, blocked);
 
   @override
   Future<FeedListState> build() async {

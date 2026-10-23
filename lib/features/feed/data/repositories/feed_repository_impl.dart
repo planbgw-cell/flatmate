@@ -47,6 +47,23 @@ class FeedRepositoryImpl implements FeedRepository {
   }
 
   @override
+  Future<List<FeedItem>> searchFeeds({
+    required String query,
+    int page = 1,
+    int pageSize = 20,
+    LocationItem? location,
+    double radiusKm = 3,
+  }) {
+    return _mock.searchFeeds(
+      query: query,
+      page: page,
+      pageSize: pageSize,
+      location: location,
+      radiusKm: radiusKm,
+    );
+  }
+
+  @override
   Future<List<FeedItem>> fetchByCategory(
     String category, {
     int page = 1,

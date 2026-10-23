@@ -21,6 +21,7 @@ import '../../features/post_create/presentation/screens/job_create_screen.dart';
 import '../../features/post_create/presentation/screens/real_estate_create_screen.dart';
 import '../../features/property/presentation/bloc/property_bloc.dart';
 import '../../features/property/presentation/pages/property_detail_page.dart';
+import '../../features/search/presentation/screens/search_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import 'route_names.dart';
 
@@ -169,6 +170,11 @@ GoRouter createAppRouter({String? initialLocation}) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) =>
             GeneralCreateScreen(targetFeed: _editTarget(state)),
+      ),
+      GoRoute(
+        path: RouteNames.search,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const SearchScreen(),
       ),
       GoRoute(
         path: RouteNames.blockedUsers,

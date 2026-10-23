@@ -69,3 +69,22 @@ final blockedUserIdsProvider = Provider<Set<String>>((ref) {
   final users = ref.watch(blockedUsersProvider).value ?? const [];
   return {for (final user in users) user.userId};
 });
+
+/// Waits for the block list; empty when it cannot be loaded. The server may
+/// not filter blocked authors out of `GET /feeds`.
+Future<Set<String>> readBlockedAuthorIds(Ref ref) async {
+  try {
+    final users = await ref.read(blockedUsersProvider.future);
+    return {for (final user in users) user.userId};
+  } catch (_) {
+    return const {};
+  }
+}
+
+List<FeedItem> withoutBlockedAuthors(
+  List<FeedItem> items,
+  Set<String> blocked,
+) =>
+    blocked.isEmpty
+        ? items
+        : items.where((e) => !blocked.contains(e.authorId)).toList();

@@ -1031,6 +1031,44 @@ void main() {
     );
   });
 
+  test('searchFeeds sends q · dong radius · latest · page/limit', () async {
+    final (api, adapter, _) = await _client(
+      (_) => (
+        200,
+        {
+          'total': 1,
+          'page': 2,
+          'limit': 20,
+          'items': [
+            _feedOut(id: 31, title: '디지털피아노 팝니다', publishedAt: '2026-10-23T00:00:00Z'),
+          ],
+        },
+      ),
+    );
+    final items = await DioFeedRepository(api).searchFeeds(
+      query: '디지털피아노',
+      page: 2,
+      location: _jeongja,
+      radiusKm: 5,
+    );
+    final request = adapter.requests.single;
+    expect(request.path, '/feeds');
+    expect(request.queryParameters, {
+      'q': '디지털피아노',
+      'page': 2,
+      'limit': 20,
+      'lat': 37.3656,
+      'lng': 127.1083,
+      'radius_m': 5000,
+      'sort': 'latest',
+    });
+    expect(items.single.title, '디지털피아노 팝니다');
+
+    await DioFeedRepository(api).searchFeeds(query: '책상');
+    expect(adapter.requests.last.queryParameters.containsKey('lat'), isFalse);
+    expect(adapter.requests.last.queryParameters['page'], 1);
+  });
+
   test('GET /feeds forwards sort (distance needs coordinates)', () async {
     final (api, adapter, _) = await _client(
       (_) => (200, {'total': 0, 'page': 1, 'limit': 10, 'items': []}),

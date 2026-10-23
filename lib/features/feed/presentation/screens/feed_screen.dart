@@ -75,11 +75,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
         visible: _chromeVisible,
         notificationBadge: true,
         onLocationTap: () => showLocationSelectModal(context),
-        onSearchTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('검색은 준비 중입니다.')),
-          );
-        },
+        onSearchTap: () => context.push(RouteNames.search),
       ),
       body: NotificationListener<UserScrollNotification>(
         onNotification: (notification) {

@@ -40,6 +40,16 @@ abstract class FeedRepository {
   /// 관심 추가/해제 (`POST` / `DELETE /feeds/{id}/like`).
   Future<LikeResult> toggleLike(String id, {required bool currentlyLiked});
 
+  /// `GET /feeds?q=`: title or body contains [query] (case-insensitive),
+  /// newest first within [radiusKm] of [location].
+  Future<List<FeedItem>> searchFeeds({
+    required String query,
+    int page = 1,
+    int pageSize = 20,
+    LocationItem? location,
+    double radiusKm = 3,
+  });
+
   /// Author only (`PATCH /feeds/{id}`). [imageUrls] are server paths (first
   /// one becomes the thumbnail); `feed_type` cannot change.
   Future<FeedItem> updateFeed(
