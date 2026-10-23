@@ -6,6 +6,7 @@ import '../../core/auth/token_storage.dart';
 import '../../core/di/injection.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/sign_up_screen.dart';
+import '../../features/block_report/presentation/screens/blocked_users_screen.dart';
 import '../../features/chat/domain/models/chat_room.dart';
 import '../../features/chat/presentation/screens/chat_list_screen.dart';
 import '../../features/chat/presentation/screens/chat_room_screen.dart';
@@ -28,6 +29,7 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// Screens that call JWT-protected APIs (`POST /feeds`, `/chats/*`).
 const _protectedPrefixes = [
   '/post/create',
+  RouteNames.blockedUsers,
   RouteNames.chat,
   RouteNames.localLife,
 ];
@@ -167,6 +169,11 @@ GoRouter createAppRouter({String? initialLocation}) {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) =>
             GeneralCreateScreen(targetFeed: _editTarget(state)),
+      ),
+      GoRoute(
+        path: RouteNames.blockedUsers,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const BlockedUsersScreen(),
       ),
       GoRoute(
         path: RouteNames.locationMapPicker,

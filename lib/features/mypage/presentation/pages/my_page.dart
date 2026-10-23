@@ -68,6 +68,21 @@ class MyPage extends ConsumerWidget {
         body: Column(
           children: [
             _ProfileHeader(user: user),
+            ListTile(
+              key: const ValueKey('menu-blocked-users'),
+              dense: true,
+              leading: const Icon(
+                Icons.block,
+                color: AppColors.textSecondary,
+              ),
+              title: Text('차단 사용자 관리', style: AppTypography.bodyLarge),
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.textHint,
+              ),
+              onTap: () => context.push(RouteNames.blockedUsers),
+            ),
+            const Divider(height: 1),
             const TabBar(
               labelColor: AppColors.textPrimary,
               unselectedLabelColor: AppColors.textHint,

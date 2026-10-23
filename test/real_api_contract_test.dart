@@ -12,6 +12,8 @@ import 'package:flatmate_app/core/network/media_url.dart';
 import 'package:flatmate_app/features/post_create/data/image_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flatmate_app/features/auth/data/repositories/dio_auth_repository.dart';
+import 'package:flatmate_app/features/block_report/data/dio_block_report_repository.dart';
+import 'package:flatmate_app/features/block_report/domain/models/report_reason.dart';
 import 'package:flatmate_app/features/chat/data/repositories/dio_chat_repository.dart';
 import 'package:flatmate_app/features/feed/data/repositories/dio_feed_repository.dart';
 import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
@@ -905,6 +907,108 @@ void main() {
     );
     expect(resolveMediaUrl('https://cdn/x.png'), 'https://cdn/x.png');
     expect(resolveMediaUrl(null), '');
+  });
+
+  group('reports / blocks', () {
+    test('POST /reports/feeds sends int feed_id · reason · details', () async {
+      final (api, adapter, _) = await _client(
+        (_) => (
+          201,
+          {
+            'id': 1,
+            'feed_id': 7,
+            'reason': 'FRAUD',
+            'details': '선입금 요구',
+            'created_at': '2026-10-23T01:00:00Z',
+          },
+        ),
+      );
+      final repo = DioBlockReportRepository(api);
+
+      await repo.reportFeed('7', ReportReason.fraud, details: ' 선입금 요구 ');
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/reports/feeds');
+      expect(request.headers['Authorization'], 'Bearer jwt-abc');
+      expect(request.data, {
+        'feed_id': 7,
+        'reason': 'FRAUD',
+        'details': '선입금 요구',
+      });
+
+      await repo.reportFeed('7', ReportReason.spam, details: '  ');
+      expect(adapter.requests.last.data, {'feed_id': 7, 'reason': 'SPAM'});
+    });
+
+    test('duplicate report surfaces the 400 status', () async {
+      final (api, _, _) = await _client(
+        (_) => (400, {'detail': 'Already reported'}),
+      );
+      await expectLater(
+        DioBlockReportRepository(api).reportFeed('7', ReportReason.other),
+        throwsA(
+          isA<ApiException>().having((e) => e.statusCode, 'statusCode', 400),
+        ),
+      );
+    });
+
+    test('non-numeric ids are rejected without a request', () async {
+      final (api, adapter, _) = await _client((_) => (200, null));
+      final repo = DioBlockReportRepository(api);
+      await expectLater(
+        repo.reportFeed('f-1', ReportReason.spam),
+        throwsA(isA<ApiException>()),
+      );
+      await expectLater(repo.blockUser('mock'), throwsA(isA<ApiException>()));
+      expect(adapter.requests, isEmpty);
+    });
+
+    test('block POST · unblock DELETE · list maps BlockedUserOut', () async {
+      final blocked = {
+        'user_id': 12,
+        'nickname': '판매자',
+        'profile_image': '/static/images/p.png',
+        'blocked_at': '2026-10-23T01:00:00Z',
+      };
+      final (api, adapter, _) = await _client((o) {
+        if (o.method == 'DELETE') return (200, {'user_id': 12, 'is_blocked': false});
+        if (o.method == 'GET') {
+          return (
+            200,
+            [
+              blocked,
+              {
+                'user_id': 13,
+                'nickname': '이웃',
+                'profile_image': null,
+                'blocked_at': '2026-10-22T01:00:00Z',
+              },
+            ],
+          );
+        }
+        return (200, blocked);
+      });
+      final repo = DioBlockReportRepository(api);
+
+      final user = await repo.blockUser('12');
+      expect(adapter.requests.last.method, 'POST');
+      expect(adapter.requests.last.path, '/blocks/users');
+      expect(adapter.requests.last.data, {'blocked_user_id': 12});
+      expect(user.userId, '12');
+      expect(user.nickname, '판매자');
+      expect(user.profileImageUrl, startsWith('http'));
+      expect(user.profileImageUrl, endsWith('/static/images/p.png'));
+
+      final list = await repo.getBlockedUsers();
+      expect(adapter.requests.last.path, '/blocks/users');
+      expect(list.map((u) => u.userId), ['12', '13']);
+      expect(list.last.profileImageUrl, isNull);
+      expect(list.first.blockedAt.toUtc(), DateTime.utc(2026, 10, 23, 1));
+
+      await repo.unblockUser('12');
+      expect(adapter.requests.last.method, 'DELETE');
+      expect(adapter.requests.last.path, '/blocks/users/12');
+    });
   });
 
   test('toServerMediaPath strips the API origin only', () {

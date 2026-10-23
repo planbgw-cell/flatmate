@@ -7,11 +7,20 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
+import '../../block_report/presentation/providers/blocked_users_provider.dart';
+import '../../block_report/presentation/widgets/report_sheet.dart';
 import '../domain/models/feed_item.dart';
 import 'providers/feed_provider.dart';
 
 String _errorText(Object error, String fallback) =>
     error is ApiException ? error.message : fallback;
+
+/// Pushes the login screen for guests; `true` once a session exists.
+Future<bool> ensureSession(BuildContext context, WidgetRef ref) async {
+  if (ref.read(tokenStorageProvider).hasSession) return true;
+  final loggedIn = await context.push<bool>(RouteNames.login);
+  return loggedIn == true;
+}
 
 /// Heart tap: requires login (JWT), then optimistic toggle with rollback.
 Future<void> toggleFeedLike(
@@ -20,10 +29,7 @@ Future<void> toggleFeedLike(
   String feedId,
 ) async {
   final messenger = ScaffoldMessenger.of(context);
-  if (!ref.read(tokenStorageProvider).hasSession) {
-    final loggedIn = await context.push<bool>(RouteNames.login);
-    if (loggedIn != true) return;
-  }
+  if (!await ensureSession(context, ref)) return;
   try {
     await ref.read(favoriteItemProvider(feedId).notifier).toggle();
   } catch (e) {
@@ -133,6 +139,79 @@ Future<bool> deleteFeedWithConfirm(
   } catch (e) {
     messenger.showSnackBar(
       SnackBar(content: Text(_errorText(e, '게시글을 삭제하지 못했어요.'))),
+    );
+    return false;
+  }
+}
+
+/// 신고 사유 sheet → `POST /reports/feeds`. `true` if the report was filed.
+Future<bool> reportFeedWithSheet(
+  BuildContext context,
+  WidgetRef ref,
+  FeedItem item,
+) async {
+  final submission = await showReportSheet(context);
+  if (submission == null || !context.mounted) return false;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await ref.read(blockReportRepositoryProvider).reportFeed(
+          item.id,
+          submission.reason,
+          details: submission.details,
+        );
+    messenger.showSnackBar(
+      const SnackBar(content: Text('신고가 접수되었어요.')),
+    );
+    return true;
+  } catch (e) {
+    final duplicate = e is ApiException &&
+        (e.statusCode == 400 || e.statusCode == 409);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          duplicate ? '이미 신고한 게시글입니다.' : _errorText(e, '신고하지 못했어요.'),
+        ),
+      ),
+    );
+    return false;
+  }
+}
+
+/// Confirmation → `POST /blocks/users`. `true` if the author is now blocked.
+Future<bool> blockAuthorWithConfirm(
+  BuildContext context,
+  WidgetRef ref,
+  FeedItem item,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('이 유저를 차단할까요?'),
+      content: const Text('해당 유저의 글과 채팅이 더 이상 보이지 않습니다.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          key: const ValueKey('confirm-block'),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('차단', style: TextStyle(color: AppColors.error)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return false;
+
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final user = await ref.read(blockedUsersProvider.notifier).block(item);
+    final name = user.nickname.isNotEmpty ? user.nickname : item.authorName;
+    messenger.showSnackBar(SnackBar(content: Text('$name님을 차단했어요.')));
+    return true;
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(_errorText(e, '차단하지 못했어요.'))),
     );
     return false;
   }

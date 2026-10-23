@@ -6,6 +6,9 @@ import '../../data/local/local_storage.dart';
 import '../../features/auth/data/repositories/dio_auth_repository.dart';
 import '../../features/auth/data/repositories/mock_auth_repository.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/block_report/data/dio_block_report_repository.dart';
+import '../../features/block_report/data/mock_block_report_repository.dart';
+import '../../features/block_report/domain/block_report_repository.dart';
 import '../../features/chat/data/repositories/dio_chat_repository.dart';
 import '../../features/chat/data/repositories/mock_chat_repository.dart';
 import '../../features/chat/domain/repositories/chat_repository.dart';
@@ -82,6 +85,9 @@ Future<void> configureDependencies() async {
     sl.registerLazySingleton<LocationRepository>(MockLocationRepository.new);
     sl.registerLazySingleton<AuthRepository>(MockAuthRepository.new);
     sl.registerLazySingleton<ImageUploadService>(MockImageUploadService.new);
+    sl.registerLazySingleton<BlockReportRepository>(
+      MockBlockReportRepository.new,
+    );
   } else {
     sl.registerLazySingleton<ImageUploadService>(
       () => DioImageUploadService(sl()),
@@ -97,6 +103,9 @@ Future<void> configureDependencies() async {
     );
     sl.registerLazySingleton<LocationRepository>(
       () => DioLocationRepository(sl()),
+    );
+    sl.registerLazySingleton<BlockReportRepository>(
+      () => DioBlockReportRepository(sl()),
     );
   }
 

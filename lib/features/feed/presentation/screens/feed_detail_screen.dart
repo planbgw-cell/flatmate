@@ -109,10 +109,21 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                 ]
               : [
                   ListTile(
+                    key: const ValueKey('menu-report'),
                     leading: const Icon(Icons.flag_outlined),
-                    title: const Text('신고하기'),
+                    title: const Text('게시글 신고하기'),
                     onTap: () => Navigator.pop(context, 'report'),
                   ),
+                  if (item.authorId != null)
+                    ListTile(
+                      key: const ValueKey('menu-block'),
+                      leading: const Icon(Icons.block, color: AppColors.error),
+                      title: const Text(
+                        '이 유저 차단하기',
+                        style: TextStyle(color: AppColors.error),
+                      ),
+                      onTap: () => Navigator.pop(context, 'block'),
+                    ),
                 ],
         ),
       ),
@@ -130,9 +141,14 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
         final deleted = await deleteFeedWithConfirm(context, ref, item);
         if (deleted && mounted) context.go(RouteNames.home);
       case 'report':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('신고 기능은 준비 중입니다.')),
-        );
+        if (!await ensureSession(context, ref) || !mounted) return;
+        await reportFeedWithSheet(context, ref, item);
+      case 'block':
+        if (!await ensureSession(context, ref) || !mounted) return;
+        if (item.authorId == ref.read(currentUserIdProvider)) return;
+        final blocked = await blockAuthorWithConfirm(context, ref, item);
+        if (!blocked || !mounted) return;
+        context.canPop() ? context.pop() : context.go(RouteNames.home);
     }
   }
 

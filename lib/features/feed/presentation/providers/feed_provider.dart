@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../block_report/presentation/providers/blocked_users_provider.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
@@ -54,12 +55,28 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
 
   FeedRepository get _repo => ref.read(feedRepositoryProvider);
 
+  /// The server may not filter blocked authors out of `GET /feeds`.
+  Future<Set<String>> _blockedAuthors() async {
+    try {
+      final users = await ref.read(blockedUsersProvider.future);
+      return {for (final user in users) user.userId};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static List<FeedItem> _visible(List<FeedItem> items, Set<String> blocked) =>
+      blocked.isEmpty
+          ? items
+          : items.where((e) => !blocked.contains(e.authorId)).toList();
+
   @override
   Future<FeedListState> build() async {
     final category = ref.watch(selectedCategoryProvider);
     final location = ref.watch(currentLocationProvider);
     final radiusKm = ref.watch(locationRadiusProvider);
     final sort = ref.watch(feedSortProvider);
+    final blocked = _blockedAuthors();
     final items = await _repo.fetchFeeds(
       page: 1,
       pageSize: _pageSize,
@@ -69,7 +86,7 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
       sort: sort,
     );
     return FeedListState(
-      items: items,
+      items: _visible(items, await blocked),
       page: 1,
       hasMore: items.length >= _pageSize,
     );
@@ -82,6 +99,7 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
     final sort = ref.read(feedSortProvider);
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
+      final blocked = _blockedAuthors();
       final items = await _repo.fetchFeeds(
         page: 1,
         pageSize: _pageSize,
@@ -91,7 +109,7 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
         sort: sort,
       );
       return FeedListState(
-        items: items,
+        items: _visible(items, await blocked),
         page: 1,
         hasMore: items.length >= _pageSize,
       );
@@ -116,9 +134,10 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
         radiusKm: radiusKm,
         sort: ref.read(feedSortProvider),
       );
+      final blocked = await _blockedAuthors();
       state = AsyncData(
         FeedListState(
-          items: [...current.items, ...more],
+          items: [...current.items, ..._visible(more, blocked)],
           page: nextPage,
           hasMore: more.length >= _pageSize,
         ),
@@ -143,6 +162,17 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
     state = AsyncData(
       current.copyWith(
         items: current.items.where((item) => item.id != id).toList(),
+      ),
+    );
+  }
+
+  /// Drops a just-blocked author's posts before the refetch lands.
+  void removeByAuthor(String authorId) {
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(
+      current.copyWith(
+        items: current.items.where((item) => item.authorId != authorId).toList(),
       ),
     );
   }
