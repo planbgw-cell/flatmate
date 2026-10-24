@@ -55,6 +55,8 @@ class MyPage extends ConsumerWidget {
                 label: '로그인 / 회원가입',
                 onPressed: () => context.push(RouteNames.login),
               ),
+              const SizedBox(height: AppSpacing.md),
+              const _NoticesMenuTile(),
             ],
           ),
         ),
@@ -68,6 +70,7 @@ class MyPage extends ConsumerWidget {
         body: Column(
           children: [
             _ProfileHeader(user: user),
+            const _NoticesMenuTile(),
             ListTile(
               key: const ValueKey('menu-blocked-users'),
               dense: true,
@@ -166,6 +169,26 @@ class _ProfileHeader extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Public for guests too (`GET /notices` needs no login).
+class _NoticesMenuTile extends StatelessWidget {
+  const _NoticesMenuTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: const ValueKey('menu-notices'),
+      dense: true,
+      leading: const Icon(
+        Icons.campaign_outlined,
+        color: AppColors.textSecondary,
+      ),
+      title: Text('공지사항', style: AppTypography.bodyLarge),
+      trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
+      onTap: () => context.push(RouteNames.notices),
     );
   }
 }

@@ -13,6 +13,8 @@ abstract final class RouteNames {
   static const jobs = '/jobs';
   static const localLife = '/local-life';
   static const search = '/search';
+  static const notices = '/notices';
+  static const noticeDetail = '/notices/detail';
   static const myPage = '/mypage';
   static const blockedUsers = '/mypage/blocked';
   static const postCreateRealEstate = '/post/create/real-estate';

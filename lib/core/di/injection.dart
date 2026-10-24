@@ -26,6 +26,9 @@ import '../../features/location/data/repositories/dio_location_repository.dart';
 import '../../features/location/data/repositories/mock_location_repository.dart';
 import '../../features/location/domain/repositories/location_repository.dart';
 import '../../features/mypage/data/repositories/profile_repository_impl.dart';
+import '../../features/notice/data/dio_notice_repository.dart';
+import '../../features/notice/data/mock_notice_repository.dart';
+import '../../features/notice/domain/notice_repository.dart';
 import '../../features/post_create/data/image_upload_service.dart';
 import '../../features/mypage/domain/repositories/profile_repository.dart';
 import '../../features/mypage/domain/usecases/get_my_profile_usecase.dart';
@@ -88,6 +91,7 @@ Future<void> configureDependencies() async {
     sl.registerLazySingleton<BlockReportRepository>(
       MockBlockReportRepository.new,
     );
+    sl.registerLazySingleton<NoticeRepository>(MockNoticeRepository.new);
   } else {
     sl.registerLazySingleton<ImageUploadService>(
       () => DioImageUploadService(sl()),
@@ -106,6 +110,9 @@ Future<void> configureDependencies() async {
     );
     sl.registerLazySingleton<BlockReportRepository>(
       () => DioBlockReportRepository(sl()),
+    );
+    sl.registerLazySingleton<NoticeRepository>(
+      () => DioNoticeRepository(sl()),
     );
   }
 

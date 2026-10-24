@@ -19,6 +19,9 @@ import '../../features/main/presentation/screens/tab_screens.dart';
 import '../../features/post_create/presentation/screens/general_create_screen.dart';
 import '../../features/post_create/presentation/screens/job_create_screen.dart';
 import '../../features/post_create/presentation/screens/real_estate_create_screen.dart';
+import '../../features/notice/domain/notice.dart';
+import '../../features/notice/presentation/screens/notice_detail_screen.dart';
+import '../../features/notice/presentation/screens/notice_list_screen.dart';
 import '../../features/property/presentation/bloc/property_bloc.dart';
 import '../../features/property/presentation/pages/property_detail_page.dart';
 import '../../features/search/presentation/screens/search_screen.dart';
@@ -175,6 +178,19 @@ GoRouter createAppRouter({String? initialLocation}) {
         path: RouteNames.search,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SearchScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.notices,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const NoticeListScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.noticeDetail,
+        parentNavigatorKey: _rootNavigatorKey,
+        redirect: (context, state) =>
+            state.extra is Notice ? null : RouteNames.notices,
+        builder: (context, state) =>
+            NoticeDetailScreen(notice: state.extra! as Notice),
       ),
       GoRoute(
         path: RouteNames.blockedUsers,

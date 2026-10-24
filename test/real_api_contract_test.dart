@@ -20,6 +20,7 @@ import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
 import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/location/data/repositories/dio_location_repository.dart';
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
+import 'package:flatmate_app/features/notice/data/dio_notice_repository.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -1029,6 +1030,48 @@ void main() {
       toServerMediaPath('http://other:8000/static/a.png', apiBaseUrl: base),
       'http://other:8000/static/a.png',
     );
+  });
+
+  test('GET /notices works signed out and maps NoticeOut', () async {
+    final (api, adapter, _) = await _client(
+      (_) => (
+        200,
+        [
+          {
+            'id': 3,
+            'title': '서버 점검 안내',
+            'content': '10/25 02:00~04:00 점검합니다.',
+            'is_pinned': true,
+            'created_at': '2026-10-24T01:30:00Z',
+            'updated_at': '2026-10-24T02:00:00Z',
+          },
+          {
+            'id': 2,
+            'title': '검색 기능 추가',
+            'content': '돋보기를 눌러 보세요.',
+            'is_pinned': false,
+            'created_at': '2026-10-23T05:00:00Z',
+            'updated_at': '2026-10-23T05:00:00Z',
+          },
+        ],
+      ),
+      signedIn: false,
+    );
+    final notices = await DioNoticeRepository(api).getNotices();
+
+    final request = adapter.requests.single;
+    expect(request.method, 'GET');
+    expect(request.path, '/notices');
+    expect(request.queryParameters, {'limit': 50});
+    expect(request.headers.containsKey('Authorization'), isFalse);
+    expect(notices.map((n) => n.id), [3, 2]);
+    final pinned = notices.first;
+    expect(pinned.title, '서버 점검 안내');
+    expect(pinned.content, '10/25 02:00~04:00 점검합니다.');
+    expect(pinned.isPinned, isTrue);
+    expect(pinned.createdAt.toUtc(), DateTime.utc(2026, 10, 24, 1, 30));
+    expect(pinned.updatedAt.toUtc(), DateTime.utc(2026, 10, 24, 2));
+    expect(notices.last.isPinned, isFalse);
   });
 
   test('searchFeeds sends q · dong radius · latest · page/limit', () async {
