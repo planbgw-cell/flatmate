@@ -8,10 +8,13 @@ abstract final class RouteNames {
   static const feedDetail = '/feed/detail';
   static const feedDetailById = '/feed/detail/:id';
   static const shareFeed = '/share/feed/:id';
+  static const community = '/community';
+  static const around = '/around';
+
+  /// Former 주거 / 알바 tabs; now 홈 category chips (redirect to [home]).
   static const property = '/property';
   static const propertyDetail = '/property/:id';
   static const jobs = '/jobs';
-  static const localLife = '/local-life';
   static const search = '/search';
   static const notices = '/notices';
   static const noticeDetail = '/notices/detail';
@@ -20,6 +23,9 @@ abstract final class RouteNames {
   static const postCreateRealEstate = '/post/create/real-estate';
   static const postCreateJob = '/post/create/job';
   static const postCreateGeneral = '/post/create/general';
+  static const postCreateCommunity = '/post/create/community';
+
+  /// 채팅 tab (shell branch); rooms stay on the root navigator.
   static const chat = '/chat';
   static const chatRoom = '/chat/room/:roomId';
   static const locationMapPicker = '/location/map-picker';

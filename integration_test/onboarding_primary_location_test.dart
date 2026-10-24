@@ -167,7 +167,7 @@ void main() {
         '(id ${primary.id}) · 메인 피드 ${primary.dongName} 로드');
 
     // 2) Logout → feed dong drifts to a local default → re-login rebinds.
-    await _tap(tester, find.text('내정보'));
+    await _tap(tester, find.text('마이플랫'));
     await _pumpUntil(tester, find.text('로그아웃'));
     await _tap(tester, find.text('로그아웃'));
     await _pumpUntil(tester, find.text('로그인 / 회원가입'));

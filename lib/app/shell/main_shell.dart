@@ -1,1 +1,1 @@
-export '../../features/main/presentation/main_screen.dart';
+export '../../features/main_navigation/presentation/main_navigation_screen.dart';

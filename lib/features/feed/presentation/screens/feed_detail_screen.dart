@@ -67,7 +67,8 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
         FeedCategory.housing => RouteNames.postCreateRealEstate,
         FeedCategory.job => RouteNames.postCreateJob,
         FeedCategory.market => RouteNames.postCreateGeneral,
-        FeedCategory.all || FeedCategory.community => null,
+        FeedCategory.community => RouteNames.postCreateCommunity,
+        FeedCategory.all => null,
       };
 
   /// [⋮]: author gets 게시글 수정 / 거래 상태 변경 / 게시글 삭제; others a

@@ -109,7 +109,7 @@ void main() {
     await _pumpUntil(tester, find.text('로그인 없이 둘러보기'));
     await _tap(tester, find.text('로그인 없이 둘러보기'));
     await _pumpUntil(tester, find.byType(FeedScreen));
-    await _tap(tester, find.text('내정보'));
+    await _tap(tester, find.text('마이플랫'));
     await _pumpUntil(tester, find.byKey(const ValueKey('menu-notices')));
     await _tap(tester, find.byKey(const ValueKey('menu-notices')));
     await _pumpUntil(tester, find.byType(NoticeListScreen));

@@ -244,7 +244,7 @@ void main() {
     _step('카테고리 [중고/나눔] 필터에서도 미노출');
 
     // 4) 마이페이지 → 차단 사용자 관리 → 차단 해제 → post is back.
-    await _tap(tester, find.text('내정보'));
+    await _tap(tester, find.text('마이플랫'));
     await _pumpUntil(tester, find.byKey(const ValueKey('menu-blocked-users')));
     await _tap(tester, find.byKey(const ValueKey('menu-blocked-users')));
     await _pumpUntil(tester, find.byType(BlockedUsersScreen));

@@ -7,24 +7,29 @@ import '../../../core/common_widgets/custom_bottom_navigation_bar.dart';
 import '../../../core/theme/app_colors.dart';
 import 'widgets/write_compose_sheet.dart';
 
-/// Main shell: preserves each tab via [StatefulNavigationShell] (IndexedStack).
-/// Scroll-triggered FAB + write compose bottom sheet.
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key, required this.navigationShell});
+/// Main shell: 홈 · 동네소식 · 내주변 · 채팅 · 마이플랫, each tab preserved via
+/// [StatefulNavigationShell] (IndexedStack). Scroll-triggered 글쓰기 FAB.
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
+  static const homeIndex = 0;
+  static const communityIndex = 1;
+
   @override
-  State<MainScreen> createState() => _MainScreenState();
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _fabVisible = true;
 
-  bool get _showFab {
-    // Hide on My Page tab
-    return widget.navigationShell.currentIndex != 4;
-  }
+  int get _index => widget.navigationShell.currentIndex;
+
+  /// 내주변 (map + cards), 채팅 and 마이플랫 have no 글쓰기.
+  bool get _showFab =>
+      _index == MainNavigationScreen.homeIndex ||
+      _index == MainNavigationScreen.communityIndex;
 
   void _onTabTap(int index) {
     widget.navigationShell.goBranch(
@@ -47,6 +52,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _onWritePressed() async {
+    if (_index == MainNavigationScreen.communityIndex) {
+      context.push(RouteNames.postCreateCommunity);
+      return;
+    }
     final action = await showWriteComposeSheet(context);
     if (!mounted || action == null) return;
 
@@ -54,6 +63,7 @@ class _MainScreenState extends State<MainScreen> {
       WriteComposeAction.property => RouteNames.postCreateRealEstate,
       WriteComposeAction.job => RouteNames.postCreateJob,
       WriteComposeAction.post => RouteNames.postCreateGeneral,
+      WriteComposeAction.community => RouteNames.postCreateCommunity,
     };
     context.push(path);
   }
@@ -77,6 +87,7 @@ class _MainScreenState extends State<MainScreen> {
                 duration: const Duration(milliseconds: 180),
                 opacity: fabExpanded ? 1 : 0,
                 child: FloatingActionButton.extended(
+                  key: const ValueKey('write-fab'),
                   onPressed: fabExpanded ? _onWritePressed : null,
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,

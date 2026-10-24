@@ -13,31 +13,41 @@ class CustomBottomNavigationBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  static const _items = <({IconData icon, IconData activeIcon, String label})>[
+  static const items = <({
+    String key,
+    IconData icon,
+    IconData activeIcon,
+    String label,
+  })>[
     (
+      key: 'tab-home',
       icon: Icons.home_outlined,
       activeIcon: Icons.home,
       label: '홈',
     ),
     (
-      icon: Icons.apartment_outlined,
-      activeIcon: Icons.apartment,
-      label: '주거',
+      key: 'tab-community',
+      icon: Icons.campaign_outlined,
+      activeIcon: Icons.campaign,
+      label: '동네소식',
     ),
     (
-      icon: Icons.work_outline,
-      activeIcon: Icons.work,
-      label: '알바',
+      key: 'tab-around',
+      icon: Icons.map_outlined,
+      activeIcon: Icons.map,
+      label: '내주변',
     ),
     (
+      key: 'tab-chat',
       icon: Icons.chat_bubble_outline,
       activeIcon: Icons.chat_bubble,
       label: '채팅',
     ),
     (
+      key: 'tab-my',
       icon: Icons.person_outline,
       activeIcon: Icons.person,
-      label: '내정보',
+      label: '마이플랫',
     ),
   ];
 
@@ -56,10 +66,10 @@ class CustomBottomNavigationBar extends StatelessWidget {
       unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
       elevation: 8,
       items: [
-        for (final item in _items)
+        for (final item in items)
           BottomNavigationBarItem(
-            icon: Icon(item.icon),
-            activeIcon: Icon(item.activeIcon),
+            icon: Icon(item.icon, key: ValueKey(item.key)),
+            activeIcon: Icon(item.activeIcon, key: ValueKey(item.key)),
             label: item.label,
           ),
       ],

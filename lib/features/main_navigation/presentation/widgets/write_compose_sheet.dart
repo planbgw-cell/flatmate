@@ -4,9 +4,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 
-enum WriteComposeAction { property, job, post }
+enum WriteComposeAction { property, job, post, community }
 
-/// Bottom sheet: 부동산 등록 / 알바 공고 / 일반글 작성
+/// Bottom sheet: 부동산 등록 / 알바 공고 / 일반글 작성 / 동네소식 쓰기
 Future<WriteComposeAction?> showWriteComposeSheet(BuildContext context) {
   return showModalBottomSheet<WriteComposeAction>(
     context: context,
@@ -66,6 +66,13 @@ class WriteComposeSheet extends StatelessWidget {
               title: '일반글 작성',
               subtitle: '동네생활 · 중고 · 기타',
               onTap: () => Navigator.pop(context, WriteComposeAction.post),
+            ),
+            _WriteOptionTile(
+              icon: Icons.campaign_outlined,
+              title: '동네소식 쓰기',
+              subtitle: '우리 동네 소식 · 정보 공유',
+              onTap: () =>
+                  Navigator.pop(context, WriteComposeAction.community),
             ),
           ],
         ),

@@ -223,7 +223,7 @@ void main() {
     // 2) 마이페이지 관심목록 shows it.
     await _tap(tester, find.byIcon(Icons.arrow_back_rounded));
     await _pumpUntil(tester, find.byType(FeedScreen));
-    await _tap(tester, find.text('내정보'));
+    await _tap(tester, find.text('마이플랫'));
     await _pumpUntil(tester, find.byKey(const ValueKey('tab-my-likes')));
     await _tap(tester, find.byKey(const ValueKey('tab-my-likes')));
     await _pumpUntil(tester, find.byKey(ValueKey('my-like-${post.id}')));
@@ -250,7 +250,7 @@ void main() {
     await _pumpUntil(tester, _badgeText('trade-badge-${post.id}', '거래완료'));
     _step('피드 카드 뱃지 [거래완료]');
 
-    await _tap(tester, find.text('내정보'));
+    await _tap(tester, find.text('마이플랫'));
     await _tap(tester, find.byKey(const ValueKey('tab-my-feeds')));
     await _pumpUntil(tester, _badgeText('my-badge-${post.id}', '거래완료'));
     await _tap(tester, find.byKey(const ValueKey('my-filter-selling')));
@@ -274,7 +274,7 @@ void main() {
     await _pumpUntil(tester, find.byType(FeedScreen));
     await _pumpUntilGone(tester, find.textContaining(title));
 
-    await _tap(tester, find.text('내정보'));
+    await _tap(tester, find.text('마이플랫'));
     await _tap(tester, find.byKey(const ValueKey('tab-my-feeds')));
     await _pumpFor(tester, const Duration(seconds: 2));
     expect(find.byKey(ValueKey('my-feed-${post.id}')), findsNothing);

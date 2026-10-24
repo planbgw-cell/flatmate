@@ -8,14 +8,14 @@ import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/sign_up_screen.dart';
 import '../../features/block_report/presentation/screens/blocked_users_screen.dart';
 import '../../features/chat/domain/models/chat_room.dart';
-import '../../features/chat/presentation/screens/chat_list_screen.dart';
 import '../../features/chat/presentation/screens/chat_room_screen.dart';
 import '../../features/feed/domain/models/feed_item.dart';
 import '../../features/feed/presentation/pages/feed_detail_page.dart';
 import '../../features/feed/presentation/screens/feed_detail_screen.dart';
 import '../../features/location/presentation/screens/location_map_picker_screen.dart';
-import '../../features/main/presentation/main_screen.dart';
-import '../../features/main/presentation/screens/tab_screens.dart';
+import '../../features/main_navigation/presentation/main_navigation_screen.dart';
+import '../../features/main_navigation/presentation/screens/tab_screens.dart';
+import '../../features/post_create/presentation/screens/community_create_screen.dart';
 import '../../features/post_create/presentation/screens/general_create_screen.dart';
 import '../../features/post_create/presentation/screens/job_create_screen.dart';
 import '../../features/post_create/presentation/screens/real_estate_create_screen.dart';
@@ -35,7 +35,6 @@ const _protectedPrefixes = [
   '/post/create',
   RouteNames.blockedUsers,
   RouteNames.chat,
-  RouteNames.localLife,
 ];
 
 /// Re-runs redirects only when the session is lost (logout / refresh failure).
@@ -175,6 +174,12 @@ GoRouter createAppRouter({String? initialLocation}) {
             GeneralCreateScreen(targetFeed: _editTarget(state)),
       ),
       GoRoute(
+        path: RouteNames.postCreateCommunity,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) =>
+            CommunityCreateScreen(targetFeed: _editTarget(state)),
+      ),
+      GoRoute(
         path: RouteNames.search,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const SearchScreen(),
@@ -205,9 +210,12 @@ GoRouter createAppRouter({String? initialLocation}) {
         ),
       ),
       GoRoute(
-        path: RouteNames.chat,
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const ChatListScreen(),
+        path: RouteNames.property,
+        redirect: (context, state) => RouteNames.home,
+      ),
+      GoRoute(
+        path: RouteNames.jobs,
+        redirect: (context, state) => RouteNames.home,
       ),
       GoRoute(
         path: RouteNames.chatRoom,
@@ -223,38 +231,38 @@ GoRouter createAppRouter({String? initialLocation}) {
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
-          return MainScreen(navigationShell: navigationShell);
+          return MainNavigationScreen(navigationShell: navigationShell);
         },
         branches: [
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: RouteNames.home,
-                builder: (context, state) => const FeedScreen(),
+                builder: (context, state) => const HomeTab(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RouteNames.property,
-                builder: (context, state) => const RealEstateScreen(),
+                path: RouteNames.community,
+                builder: (context, state) => const CommunityTab(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RouteNames.jobs,
-                builder: (context, state) => const JobsScreen(),
+                path: RouteNames.around,
+                builder: (context, state) => const MapAroundTab(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RouteNames.localLife,
-                builder: (context, state) => const CommunityScreen(),
+                path: RouteNames.chat,
+                builder: (context, state) => const ChatListTab(),
               ),
             ],
           ),
@@ -262,7 +270,7 @@ GoRouter createAppRouter({String? initialLocation}) {
             routes: [
               GoRoute(
                 path: RouteNames.myPage,
-                builder: (context, state) => const MyPageScreen(),
+                builder: (context, state) => const MyPageTab(),
               ),
             ],
           ),

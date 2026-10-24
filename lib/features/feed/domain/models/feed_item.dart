@@ -78,6 +78,8 @@ class FeedItem {
     this.extraMeta = const {},
     this.isFavorite = false,
     this.tradeStatus = TradeStatus.selling,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -109,6 +111,10 @@ class FeedItem {
   /// Signed-in user's like (`is_liked`); [likeCount] mirrors `like_count`.
   final bool isFavorite;
   final TradeStatus tradeStatus;
+
+  /// Post position (`FeedOut.lat` / `lng`); null for mock / unlocated posts.
+  final double? latitude;
+  final double? longitude;
 
   List<String> get gallery =>
       imageUrls.isEmpty ? [thumbnailUrl] : imageUrls;
@@ -158,6 +164,8 @@ class FeedItem {
     Map<String, dynamic>? extraMeta,
     bool? isFavorite,
     TradeStatus? tradeStatus,
+    double? latitude,
+    double? longitude,
   }) {
     return FeedItem(
       id: id ?? this.id,
@@ -183,6 +191,8 @@ class FeedItem {
       extraMeta: extraMeta ?? this.extraMeta,
       isFavorite: isFavorite ?? this.isFavorite,
       tradeStatus: tradeStatus ?? this.tradeStatus,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }

@@ -12,7 +12,7 @@ import '../../data/image_picker_service.dart';
 import '../../data/image_upload_service.dart';
 import '../../domain/post_image.dart';
 
-enum CreatePostKind { realEstate, job, general }
+enum CreatePostKind { realEstate, job, general, community }
 
 class CreatePostDraft {
   const CreatePostDraft({
@@ -38,6 +38,7 @@ class CreatePostDraft {
         CreatePostKind.realEstate => FeedCategory.housing,
         CreatePostKind.job => FeedCategory.job,
         CreatePostKind.general => FeedCategory.market,
+        CreatePostKind.community => FeedCategory.community,
       };
 }
 
@@ -133,6 +134,7 @@ class CreatePostNotifier extends Notifier<CreatePostPhase> {
       );
       final created = await _repo.createPost(item, location: location);
       ref.invalidate(feedListProvider);
+      ref.read(feedMutationTickProvider.notifier).state++;
       return created;
     } finally {
       state = CreatePostPhase.idle;
@@ -189,6 +191,9 @@ String? validateExtraMeta(CreatePostKind kind, Map<String, dynamic> meta) {
       if (meta[ExtraMetaKeys.isFree] != true && (price is! int || price <= 0)) {
         return '가격을 입력해 주세요. (무료라면 나눔하기를 선택해 주세요)';
       }
+    case CreatePostKind.community:
+      // LOCAL_NEWS has no structured extra_meta.
+      break;
   }
   return null;
 }

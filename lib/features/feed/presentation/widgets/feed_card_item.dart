@@ -104,14 +104,16 @@ class FeedCardItem extends ConsumerWidget {
                     style: AppTypography.bodyMedium,
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    item.priceOrCondition,
-                    key: ValueKey('feed-price-${item.id}'),
-                    style: AppTypography.titleMedium.copyWith(
-                      fontWeight: FontWeight.w700,
+                  if (item.priceOrCondition.isNotEmpty) ...[
+                    Text(
+                      item.priceOrCondition,
+                      key: ValueKey('feed-price-${item.id}'),
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpacing.xs),
+                  ],
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [

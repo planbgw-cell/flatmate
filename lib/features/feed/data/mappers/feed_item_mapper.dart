@@ -91,6 +91,8 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
         0,
     isFavorite: json['is_liked'] as bool? ?? false,
     tradeStatus: TradeStatus.fromCode(json['trade_status']),
+    latitude: (json['lat'] as num?)?.toDouble(),
+    longitude: (json['lng'] as num?)?.toDouble(),
     chatCount: (meta['chat_count'] as num?)?.toInt() ?? 0,
     category: category,
     badges: typed.isStructured ? typed.badges : legacyBadges,
