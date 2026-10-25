@@ -19,13 +19,11 @@ class FlatmateApp extends ConsumerWidget {
     ref.listen(authProvider, (_, _) {});
     ref.listen(primaryLocationSyncProvider, (_, _) {});
 
-    return AppBlocProviders(
-      child: MaterialApp.router(
-        title: 'Flatmate',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        routerConfig: _router,
-      ),
+    return MaterialApp.router(
+      title: 'Flatmate',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      routerConfig: _router,
     );
   }
 }

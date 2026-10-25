@@ -5,7 +5,8 @@ import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
 import '../screens/feed_detail_screen.dart';
 
-/// Legacy id-based entry (`/home/:id`) — loads then shows [FeedDetailScreen].
+/// Id-based entry (`/feed/detail/:id`, `/share/feed/:id`) — loads then shows
+/// [FeedDetailScreen].
 class FeedDetailPage extends StatefulWidget {
   const FeedDetailPage({super.key, required this.feedId});
 

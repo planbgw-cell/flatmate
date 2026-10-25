@@ -13,18 +13,9 @@ enum FeedSort {
 /// Server like state after a toggle (`LikeOut`).
 typedef LikeResult = ({bool isLiked, int likeCount});
 
-/// Feed API contract — swap [MockFeedRepository] for a Dio/FastAPI impl later.
+/// Feed API contract (`DioFeedRepository` / `MockFeedRepository`).
 abstract class FeedRepository {
-  /// Paginated feed with category + geo filter.
-  Future<List<FeedItem>> fetchPage({
-    required int page,
-    int pageSize = 10,
-    String category = 'all',
-    LocationItem? location,
-    double radiusKm = 3,
-  });
-
-  /// Explicit geo-aware list API (FastAPI-ready signature).
+  /// Paginated feed with category + geo filter (`GET /feeds`).
   Future<List<FeedItem>> fetchFeeds({
     required int page,
     int pageSize = 10,
@@ -75,13 +66,4 @@ abstract class FeedRepository {
   /// Insert a newly created post (appears at top of subsequent fetches).
   /// [location] supplies the PostGIS point for geo queries.
   Future<FeedItem> createPost(FeedItem item, {LocationItem? location});
-
-  /// Convenience: category-filtered first page.
-  Future<List<FeedItem>> fetchByCategory(
-    String category, {
-    int page = 1,
-    int pageSize = 10,
-    LocationItem? location,
-    double radiusKm = 3,
-  });
 }

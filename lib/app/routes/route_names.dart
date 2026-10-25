@@ -3,18 +3,11 @@ abstract final class RouteNames {
   static const login = '/login';
   static const signUp = '/signup';
   static const home = '/home';
-  static const feed = '/feed';
-  static const homeDetail = '/home/:id';
   static const feedDetail = '/feed/detail';
   static const feedDetailById = '/feed/detail/:id';
   static const shareFeed = '/share/feed/:id';
   static const community = '/community';
   static const around = '/around';
-
-  /// Former 주거 / 알바 tabs; now 홈 category chips (redirect to [home]).
-  static const property = '/property';
-  static const propertyDetail = '/property/:id';
-  static const jobs = '/jobs';
   static const search = '/search';
   static const notices = '/notices';
   static const noticeDetail = '/notices/detail';

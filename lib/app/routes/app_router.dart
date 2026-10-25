@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/token_storage.dart';
@@ -22,8 +21,6 @@ import '../../features/post_create/presentation/screens/real_estate_create_scree
 import '../../features/notice/domain/notice.dart';
 import '../../features/notice/presentation/screens/notice_detail_screen.dart';
 import '../../features/notice/presentation/screens/notice_list_screen.dart';
-import '../../features/property/presentation/bloc/property_bloc.dart';
-import '../../features/property/presentation/pages/property_detail_page.dart';
 import '../../features/search/presentation/screens/search_screen.dart';
 import '../../features/splash/presentation/screens/splash_screen.dart';
 import 'route_names.dart';
@@ -93,10 +90,6 @@ GoRouter createAppRouter({String? initialLocation}) {
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
-        path: RouteNames.feed,
-        redirect: (context, state) => RouteNames.home,
-      ),
-      GoRoute(
         path: RouteNames.login,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => LoginScreen(
@@ -137,22 +130,6 @@ GoRouter createAppRouter({String? initialLocation}) {
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return FeedDetailPage(feedId: id);
-        },
-      ),
-      GoRoute(
-        path: '/home/:id',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return FeedDetailPage(feedId: id);
-        },
-      ),
-      GoRoute(
-        path: '/property/:id',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return PropertyDetailPage(propertyId: id);
         },
       ),
       GoRoute(
@@ -208,14 +185,6 @@ GoRouter createAppRouter({String? initialLocation}) {
         builder: (context, state) => LocationMapPickerScreen(
           applySelection: state.uri.queryParameters['apply'] != 'false',
         ),
-      ),
-      GoRoute(
-        path: RouteNames.property,
-        redirect: (context, state) => RouteNames.home,
-      ),
-      GoRoute(
-        path: RouteNames.jobs,
-        redirect: (context, state) => RouteNames.home,
       ),
       GoRoute(
         path: RouteNames.chatRoom,
@@ -278,20 +247,4 @@ GoRouter createAppRouter({String? initialLocation}) {
       ),
     ],
   );
-}
-
-class AppBlocProviders extends StatelessWidget {
-  const AppBlocProviders({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(create: (_) => sl<PropertyBloc>()),
-      ],
-      child: child,
-    );
-  }
 }

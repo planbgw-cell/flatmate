@@ -43,40 +43,6 @@ class DioFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<List<FeedItem>> fetchPage({
-    required int page,
-    int pageSize = 10,
-    String category = 'all',
-    LocationItem? location,
-    double radiusKm = 3,
-  }) {
-    return fetchFeeds(
-      page: page,
-      pageSize: pageSize,
-      category: category,
-      location: location,
-      radiusKm: radiusKm,
-    );
-  }
-
-  @override
-  Future<List<FeedItem>> fetchByCategory(
-    String category, {
-    int page = 1,
-    int pageSize = 10,
-    LocationItem? location,
-    double radiusKm = 3,
-  }) {
-    return fetchFeeds(
-      page: page,
-      pageSize: pageSize,
-      category: category,
-      location: location,
-      radiusKm: radiusKm,
-    );
-  }
-
-  @override
   Future<FeedItem?> fetchById(String id) async {
     // Server ids are integers; legacy/mock ids (e.g. `f-101`) cannot exist.
     if (int.tryParse(id) == null) return null;

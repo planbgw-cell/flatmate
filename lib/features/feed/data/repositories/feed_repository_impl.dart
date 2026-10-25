@@ -11,23 +11,6 @@ class FeedRepositoryImpl implements FeedRepository {
   final MockFeedRepository _mock;
 
   @override
-  Future<List<FeedItem>> fetchPage({
-    required int page,
-    int pageSize = 10,
-    String category = 'all',
-    LocationItem? location,
-    double radiusKm = 3,
-  }) {
-    return _mock.fetchPage(
-      page: page,
-      pageSize: pageSize,
-      category: category,
-      location: location,
-      radiusKm: radiusKm,
-    );
-  }
-
-  @override
   Future<List<FeedItem>> fetchFeeds({
     required int page,
     int pageSize = 10,
@@ -56,23 +39,6 @@ class FeedRepositoryImpl implements FeedRepository {
   }) {
     return _mock.searchFeeds(
       query: query,
-      page: page,
-      pageSize: pageSize,
-      location: location,
-      radiusKm: radiusKm,
-    );
-  }
-
-  @override
-  Future<List<FeedItem>> fetchByCategory(
-    String category, {
-    int page = 1,
-    int pageSize = 10,
-    LocationItem? location,
-    double radiusKm = 3,
-  }) {
-    return _mock.fetchByCategory(
-      category,
       page: page,
       pageSize: pageSize,
       location: location,
