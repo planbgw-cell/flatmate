@@ -227,7 +227,12 @@ void main() {
 
     // 3) 동네: 청룡동(서울대입구역) → only nearby posts.
     await _selectDong(tester, query: '청룡', fullName: '관악구 청룡동');
-    await _pumpUntil(tester, find.textContaining(_sellerSnuPost));
+    // Newer 한국관광공사 축제 posts nearby push it onto a later page.
+    await _scrollFeedTo(
+      tester,
+      find.textContaining(_sellerSnuPost),
+      backToTop: true,
+    );
     expect(find.textContaining(_sellerJeongjaPost), findsNothing);
     _step('청룡동(서울대입구역) 선택 → "$_sellerSnuPost"만 노출, 정자동 글 제외');
 

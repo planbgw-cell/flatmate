@@ -29,6 +29,27 @@ String? _nonEmpty(Object? value) {
   return text == null || text.isEmpty ? null : text;
 }
 
+final _dongToken = RegExp(r'^[가-힣]+[0-9]*(동|가|읍|면|리)$');
+final _parenDong = RegExp(r'\(([가-힣]+[0-9]*(?:동|가|읍|면|리))\)');
+final _districtToken = RegExp(r'^[가-힣]+(구|군|시)$');
+
+/// Dong-level label from a road / lot address (collected data often ends
+/// with a venue name or lot number):
+/// "… 둔산대로 169 (만년동)" → "만년동", "중구 회현동1가 100-115" → "회현동1가",
+/// "진안군 진안읍 진무로 1166 …" → "진안읍", "서구 상무누리로 30" → "서구".
+String neighborhoodFromAddress(String address) {
+  final trimmed = address.trim();
+  if (trimmed.isEmpty) return '';
+  final paren = _parenDong.firstMatch(trimmed);
+  if (paren != null) return paren.group(1)!;
+  final tokens = trimmed.split(RegExp(r'\s+'));
+  // The 동/읍/면 level follows 구/군/시; later tokens may be venue names
+  // ("아트밸리").
+  final dong = tokens.firstWhere(_dongToken.hasMatch, orElse: () => '');
+  if (dong.isNotEmpty) return dong;
+  return tokens.lastWhere(_districtToken.hasMatch, orElse: () => tokens.last);
+}
+
 List<String> _stringList(Object? raw) => raw is List
     ? raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
     : const [];
@@ -67,8 +88,8 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
   }
 
   final address = json['address']?.toString() ?? '';
-  final neighborhood = meta['neighborhood']?.toString() ??
-      (address.isEmpty ? '' : address.split(' ').last);
+  final neighborhood =
+      meta['neighborhood']?.toString() ?? neighborhoodFromAddress(address);
 
   final postedAt = DateTime.tryParse(json['published_at']?.toString() ?? '') ??
       DateTime.tryParse(json['created_at']?.toString() ?? '') ??
@@ -93,6 +114,9 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
     tradeStatus: TradeStatus.fromCode(json['trade_status']),
     latitude: (json['lat'] as num?)?.toDouble(),
     longitude: (json['lng'] as num?)?.toDouble(),
+    isPublicData: json['is_public_data'] == true,
+    sourceName: _nonEmpty(json['source_name']),
+    address: _nonEmpty(json['address']),
     chatCount: (meta['chat_count'] as num?)?.toInt() ?? 0,
     category: category,
     badges: typed.isStructured ? typed.badges : legacyBadges,
@@ -101,6 +125,7 @@ FeedItem feedItemFromJson(Map<String, dynamic> json) {
     // Collected (external) feeds have no author → "이웃".
     authorName: _nonEmpty(json['author_nickname']) ??
         _nonEmpty(meta['author_nickname']) ??
+        _nonEmpty(json['source_name']) ??
         '이웃',
     authorAvatarUrl: _nonEmpty(
       resolveMediaUrl(json['author_profile_image']?.toString()),

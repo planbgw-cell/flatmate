@@ -21,6 +21,11 @@ abstract final class ExtraMetaKeys {
   static const price = 'price';
   static const isFree = 'is_free';
   static const canNegotiate = 'can_negotiate';
+
+  // LOCAL_NEWS collected from 한국관광공사 — category FESTIVAL, ISO dates.
+  static const category = 'category';
+  static const eventStartDate = 'event_start_date';
+  static const eventEndDate = 'event_end_date';
 }
 
 enum RoomType {
@@ -96,6 +101,28 @@ class FeedExtraMeta {
   bool get isFree => values[ExtraMetaKeys.isFree] == true;
   bool get canNegotiate => values[ExtraMetaKeys.canNegotiate] == true;
 
+  bool get isFestival => values[ExtraMetaKeys.category] == 'FESTIVAL';
+  DateTime? get eventStart => _date(ExtraMetaKeys.eventStartDate);
+  DateTime? get eventEnd => _date(ExtraMetaKeys.eventEndDate);
+
+  /// 축제 정보 card rows; [address] comes from `FeedOut.address`.
+  List<FeedDetailRow> festivalRows({String? address}) => [
+        if (eventPeriodLabel.isNotEmpty)
+          FeedDetailRow('행사 기간', eventPeriodLabel),
+        if (address != null && address.isNotEmpty) FeedDetailRow('장소', address),
+      ];
+
+  /// "2026.11.15" (one day) or "2026.11.15 ~ 2026.11.20"; empty if unknown.
+  String get eventPeriodLabel {
+    final start = eventStart;
+    final end = eventEnd;
+    if (start == null && end == null) return '';
+    if (start == null || end == null || start == end) {
+      return _ymd((start ?? end)!);
+    }
+    return '${_ymd(start)} ~ ${_ymd(end)}';
+  }
+
   /// Local price line (mock / offline); real posts use the server `price_text`.
   String get priceLabel => switch (category) {
         FeedCategory.housing =>
@@ -155,6 +182,15 @@ class FeedExtraMeta {
       };
 
   int? _int(String key) => (values[key] as num?)?.toInt();
+
+  DateTime? _date(String key) {
+    final raw = _string(key);
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
+
+  static String _ymd(DateTime date) =>
+      '${date.year}.${date.month.toString().padLeft(2, '0')}.'
+      '${date.day.toString().padLeft(2, '0')}';
 
   String? _string(String key) {
     final value = values[key]?.toString().trim();

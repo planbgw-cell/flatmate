@@ -8,8 +8,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
 import '../providers/feed_provider.dart';
+import 'festival_badge.dart';
 import 'like_heart.dart';
 import 'trade_status_badge.dart';
 
@@ -34,6 +36,9 @@ class FeedCardItem extends ConsumerWidget {
         ? fav.likeCount
         : item.likeCount;
     final liked = fav.isFavorite;
+    final festivalPeriod = item.isFestival
+        ? FeedExtraMeta(item.category, item.extraMeta).eventPeriodLabel
+        : '';
 
     return InkWell(
       onTap: onTap,
@@ -53,8 +58,10 @@ class FeedCardItem extends ConsumerWidget {
                 child: AspectRatio(
                   aspectRatio: 1,
                   child: CachedNetworkImage(
+                    key: ValueKey('feed-thumb-${item.id}'),
                     imageUrl: item.thumbnailUrl,
                     fit: BoxFit.cover,
+                    memCacheWidth: 270,
                     placeholder: (_, _) => Container(color: AppColors.border),
                     errorWidget: (_, _, _) => const ImageErrorWidget(
                       iconSize: 28,
@@ -81,9 +88,18 @@ class FeedCardItem extends ConsumerWidget {
                         ),
                         const SizedBox(width: 6),
                       ],
+                      if (item.isFestival) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: FestivalBadge(
+                            key: ValueKey('festival-badge-${item.id}'),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Expanded(
                         child: Text(
-                          item.title,
+                          item.displayTitle,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.titleMedium,
@@ -94,7 +110,7 @@ class FeedCardItem extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
                     [
-                      item.authorName,
+                      if (!item.isPublicData) item.authorName,
                       if (item.neighborhood.isNotEmpty) item.neighborhood,
                       _timeLabel(item),
                     ].join(' · '),
@@ -103,8 +119,23 @@ class FeedCardItem extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.bodyMedium,
                   ),
+                  if (item.isPublicData && item.sourceName != null)
+                    SourceLabel(
+                      key: ValueKey('feed-source-${item.id}'),
+                      sourceName: item.sourceName!,
+                    ),
                   const SizedBox(height: AppSpacing.xs),
-                  if (item.priceOrCondition.isNotEmpty) ...[
+                  if (item.isFestival && festivalPeriod.isNotEmpty) ...[
+                    Text(
+                      festivalPeriod,
+                      key: ValueKey('feed-period-${item.id}'),
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: FestivalBadge.color,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ] else if (item.priceOrCondition.isNotEmpty) ...[
                     Text(
                       item.priceOrCondition,
                       key: ValueKey('feed-price-${item.id}'),

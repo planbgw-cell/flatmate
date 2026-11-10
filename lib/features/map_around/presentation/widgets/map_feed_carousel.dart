@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../feed/domain/models/feed_extra_meta.dart';
 import '../../../feed/domain/models/feed_item.dart';
+import '../../../feed/presentation/widgets/festival_badge.dart';
 import 'map_feed_marker.dart';
 
 /// Horizontal post cards under the map; the selected one has an orange border.
@@ -62,6 +64,9 @@ class _MapFeedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final thumb = item.thumbnailUrl;
+    final secondLine = item.isFestival
+        ? FeedExtraMeta(item.category, item.extraMeta).eventPeriodLabel
+        : item.priceOrCondition;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
       child: Material(
@@ -92,8 +97,8 @@ class _MapFeedCard extends StatelessWidget {
                         ? Container(
                             color: AppColors.surface,
                             child: Icon(
-                              MapFeedMarker.iconFor(item.category),
-                              color: MapFeedMarker.colorFor(item.category),
+                              MapFeedMarker.iconFor(item),
+                              color: MapFeedMarker.colorFor(item),
                             ),
                           )
                         : CachedNetworkImage(
@@ -115,26 +120,46 @@ class _MapFeedCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.titleMedium,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (item.isFestival) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: FestivalBadge(
+                                key: ValueKey('map-festival-badge-${item.id}'),
+                                dense: true,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              item.displayTitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.titleMedium,
+                            ),
+                          ),
+                        ],
                       ),
-                      if (item.priceOrCondition.isNotEmpty) ...[
+                      if (secondLine.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
-                          item.priceOrCondition,
+                          secondLine,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.titleMedium.copyWith(
                             fontWeight: FontWeight.w700,
+                            color: item.isFestival ? FestivalBadge.color : null,
                           ),
                         ),
                       ],
                       const SizedBox(height: 2),
                       Text(
-                        '${item.neighborhood} · ${item.category.label}',
+                        item.isPublicData && item.sourceName != null
+                            ? '${item.neighborhood} · 출처: ${item.sourceName}'
+                            : '${item.neighborhood} · ${item.category.label}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.caption,

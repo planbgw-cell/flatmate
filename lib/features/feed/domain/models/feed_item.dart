@@ -80,6 +80,9 @@ class FeedItem {
     this.tradeStatus = TradeStatus.selling,
     this.latitude,
     this.longitude,
+    this.isPublicData = false,
+    this.sourceName,
+    this.address,
   });
 
   final String id;
@@ -115,6 +118,24 @@ class FeedItem {
   /// Post position (`FeedOut.lat` / `lng`); null for mock / unlocated posts.
   final double? latitude;
   final double? longitude;
+
+  /// Collected public data (`is_public_data`, e.g. 한국관광공사 축제); no author.
+  final bool isPublicData;
+
+  /// Data provider label (`source_name`, e.g. "한국관광공사").
+  final String? sourceName;
+
+  /// Server `address` (축제 장소 등).
+  final String? address;
+
+  /// 한국관광공사 축제 (`extra_meta.category == FESTIVAL`).
+  bool get isFestival => extraMeta['category'] == 'FESTIVAL';
+
+  static final _festivalPrefix = RegExp(r'^\s*\[축제\]\s*');
+
+  /// Title for display; the [축제] badge replaces the server's "[축제] " prefix.
+  String get displayTitle =>
+      isFestival ? title.replaceFirst(_festivalPrefix, '') : title;
 
   List<String> get gallery =>
       imageUrls.isEmpty ? [thumbnailUrl] : imageUrls;
@@ -166,6 +187,9 @@ class FeedItem {
     TradeStatus? tradeStatus,
     double? latitude,
     double? longitude,
+    bool? isPublicData,
+    String? sourceName,
+    String? address,
   }) {
     return FeedItem(
       id: id ?? this.id,
@@ -193,6 +217,9 @@ class FeedItem {
       tradeStatus: tradeStatus ?? this.tradeStatus,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      isPublicData: isPublicData ?? this.isPublicData,
+      sourceName: sourceName ?? this.sourceName,
+      address: address ?? this.address,
     );
   }
 }

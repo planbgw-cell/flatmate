@@ -155,6 +155,7 @@ class ChatRoomTile extends StatelessWidget {
                 width: 48,
                 height: 48,
                 fit: BoxFit.cover,
+                memCacheWidth: 144,
                 placeholder: (_, _) => Container(color: AppColors.border),
                 errorWidget: (_, _, _) => const ImageErrorWidget(
                   width: 48,

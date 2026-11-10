@@ -6,7 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
 
-/// Category-specific facts for the detail screen (부동산 / 알바 / 일반).
+/// Category-specific facts for the detail screen (부동산 / 알바 / 일반 / 축제).
 /// Legacy posts without typed `extra_meta` fall back to their key-value list.
 class CategoryDetailCard extends StatelessWidget {
   const CategoryDetailCard({super.key, required this.item});
@@ -16,6 +16,21 @@ class CategoryDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meta = FeedExtraMeta(item.category, item.extraMeta);
+    if (meta.isFestival) {
+      final rows = meta.festivalRows(address: item.address);
+      if (rows.isEmpty) return const SizedBox.shrink();
+      return _CardShell(
+        key: const ValueKey('detail-card-festival'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('축제 정보', style: AppTypography.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            _Rows(rows: rows),
+          ],
+        ),
+      );
+    }
     if (!meta.isStructured) {
       if (item.detailMeta.isEmpty) return const SizedBox.shrink();
       return _CardShell(

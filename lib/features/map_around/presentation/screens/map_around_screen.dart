@@ -27,6 +27,7 @@ class MapAroundScreen extends ConsumerStatefulWidget {
 
 class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
   static const _zoom = 14.0;
+  static const _focusZoom = 15.0;
 
   /// Map drag beyond this offers "이 위치에서 재검색".
   static const _researchKm = 0.3;
@@ -34,9 +35,43 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
   final _mapController = MapController();
   final _pageController = PageController(viewportFraction: 0.88);
 
+  late final LatLng _initialCenter;
+  late final double _initialZoom;
   bool _mapReady = false;
   bool _showResearch = false;
   bool _searching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Opened via "지도에서 보기" before this tab was ever built.
+    final focus = ref.read(mapFocusProvider);
+    final focusAt = focus == null ? null : feedPosition(focus);
+    final dong = ref.read(currentLocationProvider);
+    _initialCenter = focusAt == null
+        ? LatLng(dong.latitude, dong.longitude)
+        : LatLng(focusAt.lat, focusAt.lng);
+    _initialZoom = focusAt == null ? _zoom : _focusZoom;
+    if (focus != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus(focus));
+    }
+  }
+
+  Future<void> _applyFocus(FeedItem item) async {
+    if (!mounted) return;
+    ref.read(mapFocusProvider.notifier).state = null;
+    final position = feedPosition(item);
+    if (position == null) return;
+    _moveTo(position.lat, position.lng, zoom: _focusZoom);
+    setState(() {
+      _searching = true;
+      _showResearch = false;
+    });
+    await ref.read(mapAroundProvider.notifier).focus(item);
+    if (!mounted) return;
+    setState(() => _searching = false);
+    if (_pageController.hasClients) _pageController.jumpToPage(0);
+  }
 
   @override
   void dispose() {
@@ -124,6 +159,10 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     final around = aroundAsync.value;
     final showTiles = ref.watch(mapTilesEnabledProvider);
 
+    ref.listen(mapFocusProvider, (previous, next) {
+      if (next == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus(next));
+    });
     ref.listen(currentLocationProvider, (previous, next) {
       _moveTo(next.latitude, next.longitude, zoom: _zoom);
       if (_showResearch) setState(() => _showResearch = false);
@@ -158,8 +197,8 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
             key: const ValueKey('map-around'),
             mapController: _mapController,
             options: MapOptions(
-              initialCenter: LatLng(dong.latitude, dong.longitude),
-              initialZoom: _zoom,
+              initialCenter: _initialCenter,
+              initialZoom: _initialZoom,
               minZoom: 8,
               maxZoom: 18,
               backgroundColor: AppColors.surface,

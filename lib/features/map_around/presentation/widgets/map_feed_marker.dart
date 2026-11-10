@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../feed/domain/models/feed_item.dart';
+import '../../../feed/presentation/widgets/festival_badge.dart';
 import '../../domain/map_feed_group.dart';
 
 /// Marker pin: category icon + price badge, or a 건수 badge for a group.
@@ -20,24 +21,31 @@ class MapFeedMarker extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  static Color colorFor(FeedCategory category) => switch (category) {
-        FeedCategory.housing => const Color(0xFF3B82F6),
-        FeedCategory.job => const Color(0xFF10B981),
-        FeedCategory.community => const Color(0xFF8B5CF6),
-        _ => AppColors.primary,
-      };
+  /// 축제 pins use the [FestivalBadge] color; others follow the category.
+  static Color colorFor(FeedItem item) {
+    if (item.isFestival) return FestivalBadge.color;
+    return switch (item.category) {
+      FeedCategory.housing => const Color(0xFF3B82F6),
+      FeedCategory.job => const Color(0xFF10B981),
+      FeedCategory.community => const Color(0xFF8B5CF6),
+      _ => AppColors.primary,
+    };
+  }
 
-  static IconData iconFor(FeedCategory category) => switch (category) {
-        FeedCategory.housing => Icons.apartment,
-        FeedCategory.job => Icons.work,
-        FeedCategory.community => Icons.campaign,
-        _ => Icons.shopping_bag,
-      };
+  static IconData iconFor(FeedItem item) {
+    if (item.isFestival) return Icons.celebration;
+    return switch (item.category) {
+      FeedCategory.housing => Icons.apartment,
+      FeedCategory.job => Icons.work,
+      FeedCategory.community => Icons.campaign,
+      _ => Icons.shopping_bag,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
     final lead = group.items.first;
-    final color = colorFor(lead.category);
+    final color = colorFor(lead);
     final count = group.items.length;
     final label = count > 1 ? '$count건' : markerLabel(lead);
     final background = selected ? color : Colors.white;
@@ -66,7 +74,7 @@ class MapFeedMarker extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    count > 1 ? Icons.layers : iconFor(lead.category),
+                    count > 1 ? Icons.layers : iconFor(lead),
                     size: 14,
                     color: foreground,
                   ),

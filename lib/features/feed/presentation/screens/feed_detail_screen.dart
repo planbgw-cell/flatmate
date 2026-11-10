@@ -11,6 +11,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
+import '../../../map_around/presentation/providers/map_around_provider.dart';
+import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
 import '../feed_actions.dart';
 import '../providers/feed_provider.dart';
@@ -18,6 +20,7 @@ import '../widgets/author_profile_card.dart';
 import '../widgets/category_detail_card.dart';
 import '../widgets/detail_bottom_bar.dart';
 import '../widgets/detail_image_carousel.dart';
+import '../widgets/festival_badge.dart';
 import '../widgets/trade_status_badge.dart';
 
 /// Feed item detail — parallax gallery, trust profile, sticky CTA.
@@ -153,6 +156,18 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     }
   }
 
+  /// Public data (축제): 내주변 tab centered on the post, with it selected.
+  void _openOnMap(FeedItem item) {
+    if (item.latitude == null || item.longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('위치 정보가 없는 글이에요.')),
+      );
+      return;
+    }
+    ref.read(mapFocusProvider.notifier).state = item;
+    context.go(RouteNames.around);
+  }
+
   Future<void> _onCta(FeedItem item) async {
     if (!ref.read(tokenStorageProvider).hasSession) {
       final loggedIn = await context.push<bool>(RouteNames.login);
@@ -244,7 +259,14 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: AuthorProfileCard(item: item)),
+            SliverToBoxAdapter(
+              child: item.isPublicData
+                  ? SourceInfoCard(
+                      key: const ValueKey('detail-source-card'),
+                      item: item,
+                    )
+                  : AuthorProfileCard(item: item),
+            ),
             const SliverToBoxAdapter(child: Divider(height: 1)),
             SliverToBoxAdapter(
               child: Padding(
@@ -266,8 +288,21 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (item.isFestival) ...[
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6),
+                            child: FestivalBadge(
+                              key: ValueKey('detail-festival-badge'),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                        ],
                         Expanded(
-                          child: Text(item.title, style: AppTypography.header1),
+                          child: Text(
+                            item.displayTitle,
+                            key: const ValueKey('detail-title'),
+                            style: AppTypography.header1,
+                          ),
                         ),
                         if (item.tradeStatus != TradeStatus.selling) ...[
                           const SizedBox(width: AppSpacing.xs),
@@ -331,13 +366,23 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
             ),
           ],
         ),
-        bottomNavigationBar: DetailBottomBar(
-          priceOrCondition: item.priceOrCondition,
-          ctaLabel: item.ctaButtonLabel,
-          liked: fav.isFavorite,
-          onLikeToggle: () => toggleFeedLike(context, ref, item.id),
-          onCtaPressed: () => _onCta(item),
-        ),
+        bottomNavigationBar: item.isPublicData
+            ? DetailBottomBar(
+                priceOrCondition: FeedExtraMeta(item.category, item.extraMeta)
+                    .eventPeriodLabel,
+                ctaLabel: '지도에서 보기',
+                ctaKey: const ValueKey('detail-map-cta'),
+                liked: fav.isFavorite,
+                onLikeToggle: () => toggleFeedLike(context, ref, item.id),
+                onCtaPressed: () => _openOnMap(item),
+              )
+            : DetailBottomBar(
+                priceOrCondition: item.priceOrCondition,
+                ctaLabel: item.ctaButtonLabel,
+                liked: fav.isFavorite,
+                onLikeToggle: () => toggleFeedLike(context, ref, item.id),
+                onCtaPressed: () => _onCta(item),
+              ),
       ),
     );
   }

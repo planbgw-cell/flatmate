@@ -38,6 +38,7 @@ class DetailImageCarousel extends StatelessWidget {
               key: ValueKey('detail-image-$i'),
               imageUrl: url,
               fit: BoxFit.cover,
+              memCacheWidth: 1440,
               placeholder: (_, _) => Container(color: AppColors.border),
               errorWidget: (_, _, _) => const ImageErrorWidget(iconSize: 48),
             );

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../block_report/presentation/providers/blocked_users_provider.dart';
 import '../../../feed/domain/models/feed_item.dart';
@@ -9,6 +10,10 @@ import '../../domain/map_feed_group.dart';
 
 /// Network OSM tiles; widget tests turn them off.
 final mapTilesEnabledProvider = Provider<bool>((ref) => true);
+
+/// "지도에서 보기" request from a detail screen; the 내주변 tab centers on the
+/// post, selects it and clears this.
+final mapFocusProvider = StateProvider<FeedItem?>((ref) => null);
 
 class MapAroundState {
   const MapAroundState({
@@ -89,23 +94,55 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
   /// "이 위치에서 재검색" / "내 동네로". The current markers stay until the
   /// new result lands.
   Future<void> searchAt(double lat, double lng) async {
+    // A still-running first load must not overwrite this result.
+    try {
+      await future;
+    } catch (_) {
+      // Replaced by the search below.
+    }
     state = await AsyncValue.guard(() => _load(lat, lng));
   }
 
-  /// Marker tap: that position's posts move to the front of the cards.
-  void select(MapFeedGroup group) {
+  /// Marker tap: that position's posts move to the front of the cards
+  /// ([focusId] first when given).
+  void select(MapFeedGroup group, {String? focusId}) {
     final current = state.value;
     if (current == null) return;
     final ids = {for (final item in group.items) item.id};
+    final groupItems = [
+      ...group.items.where((item) => item.id == focusId),
+      ...group.items.where((item) => item.id != focusId),
+    ];
     state = AsyncData(
       current.copyWith(
         items: [
-          ...group.items,
+          ...groupItems,
           ...current.items.where((item) => !ids.contains(item.id)),
         ],
-        selectedId: group.id,
+        selectedId: groupItems.first.id,
       ),
     );
+  }
+
+  /// "지도에서 보기": search around [item] and select it.
+  Future<void> focus(FeedItem item) async {
+    final position = feedPosition(item);
+    if (position == null) return;
+    await searchAt(position.lat, position.lng);
+    var current = state.value;
+    if (current == null) return;
+    if (!current.items.any((e) => e.id == item.id)) {
+      final items = [item, ...current.items];
+      current = MapAroundState(
+        centerLat: current.centerLat,
+        centerLng: current.centerLng,
+        items: items,
+        groups: groupFeedsByPosition(items),
+      );
+      state = AsyncData(current);
+    }
+    final group = current.groups.firstWhere((g) => g.contains(item.id));
+    select(group, focusId: item.id);
   }
 
   /// Card swipe: highlight without reordering.

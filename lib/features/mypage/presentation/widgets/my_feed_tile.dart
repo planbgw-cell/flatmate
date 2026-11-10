@@ -40,6 +40,7 @@ class MyFeedTile extends StatelessWidget {
                 width: 64,
                 height: 64,
                 fit: BoxFit.cover,
+                memCacheWidth: 192,
                 placeholder: (_, _) => Container(color: AppColors.border),
                 errorWidget: (_, _, _) => const ImageErrorWidget(
                   width: 64,

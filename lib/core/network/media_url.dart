@@ -1,13 +1,25 @@
 import '../../app/config/app_config.dart';
 
-/// Server media is returned as origin-relative paths (`/static/images/…`);
-/// they live next to the API, outside the `/api/v1` prefix.
+/// Display URL for server media:
+/// - origin-relative paths (`/static/images/…`, uploads) live next to the API,
+///   outside the `/api/v1` prefix;
+/// - external absolute URLs (e.g. 한국관광공사 `tong.visitkorea.or.kr`) are
+///   used as-is, but `http` is upgraded to `https` because Android blocks
+///   cleartext traffic to every host except the dev API server.
 String resolveMediaUrl(String? url, {String? apiBaseUrl}) {
   final value = url?.trim() ?? '';
   if (value.isEmpty) return '';
-  if (value.startsWith('http://') || value.startsWith('https://')) return value;
   final base = Uri.parse(apiBaseUrl ?? AppConfig.resolve().apiBaseUrl);
-  return base.replace(path: value, query: null, fragment: null).toString();
+  if (value.startsWith('//')) return 'https:$value';
+  if (value.startsWith('https://')) return value;
+  if (value.startsWith('http://')) {
+    final uri = Uri.tryParse(value);
+    final isApiHost =
+        uri != null && uri.host == base.host && uri.port == base.port;
+    return isApiHost ? value : 'https://${value.substring('http://'.length)}';
+  }
+  final path = value.startsWith('/') ? value : '/$value';
+  return base.replace(path: path, query: null, fragment: null).toString();
 }
 
 /// Inverse of [resolveMediaUrl] for request bodies: URLs on the API origin go

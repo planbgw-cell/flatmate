@@ -35,6 +35,7 @@ class ChatProductHeader extends StatelessWidget {
                 width: 44,
                 height: 44,
                 fit: BoxFit.cover,
+                memCacheWidth: 132,
                 placeholder: (_, _) => Container(color: AppColors.border),
                 errorWidget: (_, _, _) => const ImageErrorWidget(
                   width: 44,

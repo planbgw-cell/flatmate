@@ -13,10 +13,12 @@ class DetailBottomBar extends StatelessWidget {
     required this.liked,
     required this.onLikeToggle,
     required this.onCtaPressed,
+    this.ctaKey,
   });
 
   final String priceOrCondition;
   final String ctaLabel;
+  final Key? ctaKey;
   final bool liked;
   final VoidCallback onLikeToggle;
   final VoidCallback onCtaPressed;
@@ -64,6 +66,7 @@ class DetailBottomBar extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.xs),
             FilledButton(
+              key: ctaKey,
               onPressed: onCtaPressed,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
