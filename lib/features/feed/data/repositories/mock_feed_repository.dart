@@ -164,6 +164,24 @@ class MockFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<List<FeedItem>> fetchLocalNews({
+    required int locationId,
+    PublicScope scope = PublicScope.sigungu,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    await _delay();
+    if (page < 1) return const [];
+    final items = _catalog()
+        .where((item) => !item.id.contains('-p'))
+        .where((item) => !_deleted.contains(item.id))
+        .where((item) => item.category == FeedCategory.community)
+        .map(_withFavorite)
+        .toList();
+    return items.skip((page - 1) * pageSize).take(pageSize).toList();
+  }
+
+  @override
   Future<List<FeedItem>> searchFeeds({
     required String query,
     int page = 1,

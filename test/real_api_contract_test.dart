@@ -1074,6 +1074,29 @@ void main() {
     expect(notices.last.isPinned, isFalse);
   });
 
+  test('fetchLocalNews: LOCAL_NEWS by location_id + public_scope, no lat/lng',
+      () async {
+    final (api, adapter, _) = await _client(
+      (_) => (200, {'total': 0, 'page': 1, 'limit': 20, 'items': const []}),
+    );
+    final repo = DioFeedRepository(api);
+    await repo.fetchLocalNews(locationId: 15);
+    expect(adapter.requests.last.path, '/feeds');
+    expect(adapter.requests.last.queryParameters, {
+      'feed_type': 'LOCAL_NEWS',
+      'location_id': 15,
+      'public_scope': 'sigungu',
+      'page': 1,
+      'limit': 20,
+    });
+
+    await repo.fetchLocalNews(locationId: 15, scope: PublicScope.zone, page: 2);
+    final query = adapter.requests.last.queryParameters;
+    expect(query['public_scope'], 'zone');
+    expect(query['page'], 2);
+    expect(query.keys, isNot(contains('lat')));
+  });
+
   test('searchFeeds sends q · dong radius · latest · page/limit', () async {
     final (api, adapter, _) = await _client(
       (_) => (

@@ -43,6 +43,26 @@ class DioFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<List<FeedItem>> fetchLocalNews({
+    required int locationId,
+    PublicScope scope = PublicScope.sigungu,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final response = await _api.get<dynamic>(
+      '/feeds',
+      queryParameters: {
+        'feed_type': feedTypeForCategoryKey(FeedCategory.community.name),
+        'location_id': locationId,
+        'public_scope': scope.name,
+        'page': page,
+        'limit': pageSize,
+      },
+    );
+    return _parseList(response.data);
+  }
+
+  @override
   Future<FeedItem?> fetchById(String id) async {
     // Server ids are integers; legacy/mock ids (e.g. `f-101`) cannot exist.
     if (int.tryParse(id) == null) return null;

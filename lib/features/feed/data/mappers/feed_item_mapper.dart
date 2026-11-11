@@ -164,6 +164,8 @@ Map<String, dynamic> feedCreateToJson(FeedItem item, {LocationItem? location}) {
     'feed_type': _feedTypeByCategory[item.category] ?? 'GENERAL',
     'title': item.title,
     'content': item.description,
+    // Server dong (`[우리 동네]` lists filter by it); mock ids are skipped.
+    'location_id': ?int.tryParse(location?.id ?? ''),
     if (location != null) 'lat': location.latitude,
     if (location != null) 'lng': location.longitude,
     if (location != null) 'address': location.fullName,

@@ -5,6 +5,7 @@ import 'package:flatmate_app/features/feed/data/mappers/feed_item_mapper.dart';
 import 'package:flatmate_app/features/feed/data/repositories/mock_feed_repository.dart';
 import 'package:flatmate_app/features/feed/domain/models/feed_extra_meta.dart';
 import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
+import 'package:flatmate_app/features/feed/domain/models/region.dart';
 import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_detail_screen.dart';
@@ -166,6 +167,46 @@ void main() {
     });
     expect(app.isFestival, isFalse);
     expect(app.displayTitle, '[축제] 아님');
+  });
+
+  test('권역 · 지역 라벨 follow the server zone grouping', () {
+    expect(sidoShortName('경기도'), '경기');
+    expect(sidoShortName('서울특별시'), '서울');
+    expect(sidoShortName('전남광주통합특별시'), '전남광주');
+    expect(sidoShortName('성남시'), isNull);
+    final zones = {
+      '서울': '수도권',
+      '인천광역시': '수도권',
+      '경기도': '수도권',
+      '강원특별자치도': '강원권',
+      '세종특별자치시': '충청권',
+      '충청북도': '충청권',
+      '전북특별자치도': '호남권',
+      '전남광주통합특별시': '호남권',
+      '대구광역시': '대경권',
+      '경상북도': '대경권',
+      '울산광역시': '동남권',
+      '경상남도': '동남권',
+      '제주특별자치도': '제주권',
+    };
+    zones.forEach((sido, zone) => expect(zoneOf(sido), zone, reason: sido));
+    expect(zoneOf(null), isNull);
+    expect(zoneDescription('수도권'), '수도권(서울·인천·경기)');
+    expect(zoneDescription('호남권'), '호남권(전북·전남광주)');
+
+    final labels = {
+      '경기도 가평군 가평읍 달전리 1-1': '경기 가평군',
+      '서울특별시 종로구 동숭길 122 (동숭동)': '서울 종로구',
+      '서울 중구 태평로1가 1 청계광장': '서울 중구',
+      '세종특별자치시 중앙공원로 60 (세종동)': '세종',
+      '경상북도 포항시 북구 선착로 78 (동빈1가)': '경북 포항시',
+      '전남광주통합특별시 순천시 별미길 18 (남내동)': '전남광주 순천시',
+      '성남시 분당구 정자동': '',
+    };
+    labels.forEach(
+      (address, label) => expect(regionLabel(address), label, reason: address),
+    );
+    expect(zoneOfAddress('경기도 가평군 가평읍'), '수도권');
   });
 
   test('neighborhoodFromAddress picks the dong-level token', () {

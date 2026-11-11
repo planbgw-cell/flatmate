@@ -10,6 +10,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
+import '../../domain/models/region.dart';
 import '../providers/feed_provider.dart';
 import 'festival_badge.dart';
 import 'like_heart.dart';
@@ -21,11 +22,16 @@ class FeedCardItem extends ConsumerWidget {
     required this.item,
     required this.onTap,
     this.onFavoriteToggle,
+    this.showRegion = false,
   });
 
   final FeedItem item;
   final VoidCallback onTap;
   final VoidCallback? onFavoriteToggle;
+
+  /// 권역 lists: festivals show "[수도권 축제] 경기 가평군" so far-away events
+  /// read as such.
+  final bool showRegion;
 
   static const _thumb = 90.0;
 
@@ -39,6 +45,10 @@ class FeedCardItem extends ConsumerWidget {
     final festivalPeriod = item.isFestival
         ? FeedExtraMeta(item.category, item.extraMeta).eventPeriodLabel
         : '';
+    final zone = showRegion && item.isFestival
+        ? zoneOfAddress(item.address)
+        : null;
+    final region = zone == null ? '' : regionLabel(item.address);
 
     return InkWell(
       onTap: onTap,
@@ -75,6 +85,27 @@ class FeedCardItem extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (zone != null) ...[
+                    Row(
+                      key: ValueKey('festival-region-${item.id}'),
+                      children: [
+                        FestivalBadge(label: '$zone 축제'),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            region,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.badgeText.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                  ],
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -88,7 +119,7 @@ class FeedCardItem extends ConsumerWidget {
                         ),
                         const SizedBox(width: 6),
                       ],
-                      if (item.isFestival) ...[
+                      if (item.isFestival && zone == null) ...[
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: FestivalBadge(

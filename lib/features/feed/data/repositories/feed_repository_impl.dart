@@ -47,6 +47,20 @@ class FeedRepositoryImpl implements FeedRepository {
   }
 
   @override
+  Future<List<FeedItem>> fetchLocalNews({
+    required int locationId,
+    PublicScope scope = PublicScope.sigungu,
+    int page = 1,
+    int pageSize = 20,
+  }) =>
+      _mock.fetchLocalNews(
+        locationId: locationId,
+        scope: scope,
+        page: page,
+        pageSize: pageSize,
+      );
+
+  @override
   Future<FeedItem?> fetchById(String id) => _mock.fetchById(id);
 
   @override

@@ -1,31 +1,55 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../block_report/presentation/providers/blocked_users_provider.dart';
 import '../../../feed/domain/models/feed_item.dart';
+import '../../../feed/domain/repositories/feed_repository.dart';
 import '../../../feed/presentation/providers/feed_provider.dart';
+import '../../../location/domain/models/location_item.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 
-/// 동네소식 (`feed_type=LOCAL_NEWS`) within the current dong radius, paged.
+/// 동네소식 chips: [우리 동네] (`sigungu`, default) / [우리 권역 축제] (`zone`).
+final communityScopeProvider =
+    StateProvider<PublicScope>((ref) => PublicScope.sigungu);
+
+/// Current dong as a server location (numeric `location_id`, 시·도 in
+/// `cityName`). Local / mock dongs (e.g. the guest default) are resolved via
+/// reverse-geo once per dong; null when the server has no matching dong.
+final serverDongProvider = FutureProvider<LocationItem?>((ref) async {
+  final dong = ref.watch(currentLocationProvider);
+  if (int.tryParse(dong.id) != null) return dong;
+  return ref
+      .read(locationRepositoryProvider)
+      .getReverseGeo(dong.latitude, dong.longitude);
+});
+
+/// 동네소식 (`feed_type=LOCAL_NEWS`) of the current dong by [PublicScope],
+/// paged.
 class CommunityFeedNotifier extends AsyncNotifier<FeedListState> {
   static const pageSize = 20;
-  static final _category = FeedCategory.community.name;
 
   Future<List<FeedItem>> _fetch(int page) async {
+    final scope = ref.read(communityScopeProvider);
+    final dong = await ref.read(serverDongProvider.future);
+    final locationId = int.tryParse(dong?.id ?? '');
+    if (locationId == null) {
+      throw StateError('동네 정보를 확인할 수 없어요. 동네를 다시 설정해 주세요.');
+    }
     final blocked = readBlockedAuthorIds(ref);
-    final items = await ref.read(feedRepositoryProvider).fetchFeeds(
+    final items = await ref.read(feedRepositoryProvider).fetchLocalNews(
+          locationId: locationId,
+          scope: scope,
           page: page,
           pageSize: pageSize,
-          category: _category,
-          location: ref.read(currentLocationProvider),
-          radiusKm: ref.read(locationRadiusProvider),
         );
     return withoutBlockedAuthors(items, await blocked);
   }
 
   @override
   Future<FeedListState> build() async {
-    ref.watch(currentLocationProvider);
-    ref.watch(locationRadiusProvider);
+    ref.watch(communityScopeProvider);
+    // `.future`: refetch on a new dong, not on its loading → data transition.
+    await ref.watch(serverDongProvider.future);
     // New / edited / deleted posts and blocks refetch the list.
     ref.watch(feedMutationTickProvider);
     final items = await _fetch(1);

@@ -10,6 +10,10 @@ enum FeedSort {
   final String label;
 }
 
+/// How far public-data (축제) 동네소식 reach from a dong (`public_scope`):
+/// same 시·군·구, 시·도, or 권역 (e.g. 수도권 = 서울·인천·경기).
+enum PublicScope { sigungu, sido, zone }
+
 /// Server like state after a toggle (`LikeOut`).
 typedef LikeResult = ({bool isLiked, int likeCount});
 
@@ -23,6 +27,16 @@ abstract class FeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+  });
+
+  /// 동네소식 by server dong (`GET /feeds?feed_type=LOCAL_NEWS&location_id=`):
+  /// posts of that dong plus public-data posts within [scope]. No lat/lng —
+  /// the server ignores `public_scope` when coordinates are sent.
+  Future<List<FeedItem>> fetchLocalNews({
+    required int locationId,
+    PublicScope scope = PublicScope.sigungu,
+    int page = 1,
+    int pageSize = 20,
   });
 
   /// Single post detail by id.

@@ -128,9 +128,10 @@ void main() {
     final container =
         ProviderScope.containerOf(tester.element(find.byType(FeedScreen)));
 
-    // Dong = the festival's dong (as if picked in the 동네 selector).
+    // Dong = the festival's server dong (as if picked in the 동네 selector);
+    // [우리 동네] lists its 시·군·구 by `location_id`.
     container.read(currentLocationProvider.notifier).state = LocationItem(
-      id: 'e2e-festival',
+      id: festivalRow['location_id'].toString(),
       cityName: '',
       districtName: '',
       dongName: festival.neighborhood,

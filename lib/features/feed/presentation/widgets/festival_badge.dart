@@ -7,11 +7,14 @@ import '../../domain/models/feed_item.dart';
 
 /// [축제] badge for 한국관광공사 festival posts.
 class FestivalBadge extends StatelessWidget {
-  const FestivalBadge({super.key, this.dense = false});
+  const FestivalBadge({super.key, this.dense = false, this.label = '축제'});
 
   static const color = Color(0xFFE5487F);
 
   final bool dense;
+
+  /// "축제", or a 권역 label such as "수도권 축제".
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +29,7 @@ class FestivalBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.6)),
       ),
       child: Text(
-        '축제',
+        label,
         style: AppTypography.badgeText.copyWith(
           color: color,
           fontWeight: FontWeight.w700,

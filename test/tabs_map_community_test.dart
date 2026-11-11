@@ -12,6 +12,7 @@ import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
 import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
+import 'package:flatmate_app/features/location/domain/repositories/location_repository.dart';
 import 'package:flatmate_app/features/location/presentation/providers/location_provider.dart';
 import 'package:flatmate_app/features/main_navigation/presentation/main_navigation_screen.dart';
 import 'package:flatmate_app/features/map_around/domain/map_feed_group.dart';
@@ -79,10 +80,46 @@ class _Feeds extends MockFeedRepository {
     return category == FeedCategory.community.name ? community : around;
   }
 
+  final localNewsCalls = <({int locationId, PublicScope scope})>[];
+  List<FeedItem> zone = const [];
+
+  @override
+  Future<List<FeedItem>> fetchLocalNews({
+    required int locationId,
+    PublicScope scope = PublicScope.sigungu,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    localNewsCalls.add((locationId: locationId, scope: scope));
+    if (page > 1) return const [];
+    return scope == PublicScope.zone ? zone : community;
+  }
+
   @override
   Future<FeedItem> createPost(FeedItem item, {LocationItem? location}) async {
     created = item;
     return item;
+  }
+}
+
+/// Reverse-geo stand-in: local dong ids resolve to server dong 15 (경기도).
+class _Locations implements LocationRepository {
+  final reverseGeoCalls = <(double, double)>[];
+
+  @override
+  Future<List<LocationItem>> search(String query) async => const [];
+
+  @override
+  Future<LocationItem?> getReverseGeo(double lat, double lng) async {
+    reverseGeoCalls.add((lat, lng));
+    return const LocationItem(
+      id: '15',
+      cityName: '경기도',
+      districtName: '성남시 분당구',
+      dongName: '야탑1동',
+      latitude: 37.41205,
+      longitude: 127.13027,
+    );
   }
 }
 
@@ -95,10 +132,16 @@ const _yatap = LocationItem(
   longitude: 127.13027,
 );
 
-List<Override> _overrides(_Feeds feeds, {String? userId}) => [
+List<Override> _overrides(
+  _Feeds feeds, {
+  String? userId,
+  _Locations? locations,
+}) =>
+    [
       feedRepositoryProvider.overrideWithValue(feeds),
       currentUserIdProvider.overrideWithValue(userId),
       mapTilesEnabledProvider.overrideWithValue(false),
+      locationRepositoryProvider.overrideWithValue(locations ?? _Locations()),
     ];
 
 void main() {
@@ -364,16 +407,31 @@ void main() {
     expect(find.byKey(const ValueKey('map-research')), findsNothing);
   });
 
-  testWidgets('동네소식 list: empty notice, then cards', (tester) async {
+  testWidgets(
+      '동네소식: [우리 동네] default (sigungu, reverse-geo dong id), '
+      'then cards', (tester) async {
     final feeds = _Feeds();
+    final locations = _Locations();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: _overrides(feeds),
+        overrides: _overrides(feeds, locations: locations),
         child: const MaterialApp(home: CommunityScreen()),
       ),
     );
     await tester.pumpAndSettle();
-    expect(feeds.calls.single.category, 'community');
+    // Guest default dong (loc-sinchon) is not a server id → reverse-geo.
+    expect(locations.reverseGeoCalls, [
+      (kDefaultLocation.latitude, kDefaultLocation.longitude),
+    ]);
+    expect(feeds.localNewsCalls, [(locationId: 15, scope: PublicScope.sigungu)]);
+    expect(feeds.calls, isEmpty, reason: 'no lat/lng radius query');
+    final sigungu = tester.widget<ChoiceChip>(
+      find.descendant(
+        of: find.byKey(const ValueKey('community-scope-sigungu')),
+        matching: find.byType(ChoiceChip),
+      ),
+    );
+    expect(sigungu.selected, isTrue);
     expect(find.byKey(const ValueKey('community-empty')), findsOneWidget);
 
     feeds.community = [
@@ -386,5 +444,80 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('글 8'), findsOneWidget);
     expect(find.byKey(const ValueKey('feed-price-8')), findsNothing);
+  });
+
+  testWidgets('동네소식: [우리 권역 축제] → zone query + 권역·지역 뱃지',
+      (tester) async {
+    tester.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final festival = feedItemFromJson({
+      'id': 301,
+      'feed_type': 'LOCAL_NEWS',
+      'source': 'TOUR_API',
+      'is_public_data': true,
+      'source_name': '한국관광공사',
+      'title': '[축제] 자라섬 재즈페스티벌',
+      'address': '경기도 가평군 가평읍 달전리 1-1 (자라섬)',
+      'lat': 37.8195,
+      'lng': 127.5208,
+      'extra_meta': {
+        'category': 'FESTIVAL',
+        'event_start_date': '2026-11-14',
+        'event_end_date': '2026-11-16',
+      },
+      'published_at': '2026-11-10T00:00:00Z',
+    });
+    final feeds = _Feeds()..zone = [festival];
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ..._overrides(feeds),
+          currentLocationProvider.overrideWith((ref) => _yatap),
+        ],
+        child: const MaterialApp(home: CommunityScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(feeds.localNewsCalls.single, (
+      locationId: 15,
+      scope: PublicScope.sigungu,
+    ));
+
+    await tester.tap(find.byKey(const ValueKey('community-scope-zone')));
+    await tester.pumpAndSettle();
+    expect(feeds.localNewsCalls.last, (
+      locationId: 15,
+      scope: PublicScope.zone,
+    ));
+    final region = find.byKey(const ValueKey('festival-region-301'));
+    expect(region, findsOneWidget);
+    expect(
+      find.descendant(of: region, matching: find.text('수도권 축제')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: region, matching: find.text('경기 가평군')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('festival-badge-301')), findsNothing);
+    expect(find.text('자라섬 재즈페스티벌'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('community-scope-sigungu')));
+    await tester.pumpAndSettle();
+    expect(feeds.localNewsCalls.last.scope, PublicScope.sigungu);
+    expect(find.byKey(const ValueKey('community-empty')), findsOneWidget);
+  });
+
+  test('new posts carry the server dong id (location_id)', () {
+    final item = _item('1');
+    expect(feedCreateToJson(item, location: _yatap)['location_id'], 15);
+    expect(
+      feedCreateToJson(item, location: kDefaultLocation)
+          .containsKey('location_id'),
+      isFalse,
+      reason: 'mock dong id',
+    );
   });
 }
