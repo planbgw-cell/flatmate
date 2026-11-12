@@ -1,3 +1,7 @@
+import 'public_housing.dart';
+
+export 'public_housing.dart' show HousingType, PublicHousingNotice;
+
 /// Feed domain model + mock catalog for Step 1-3 UI.
 enum FeedCategory {
   all,
@@ -131,11 +135,30 @@ class FeedItem {
   /// 한국관광공사 축제 (`extra_meta.category == FESTIVAL`).
   bool get isFestival => extraMeta['category'] == 'FESTIVAL';
 
-  static final _festivalPrefix = RegExp(r'^\s*\[축제\]\s*');
+  /// LH 마이홈 등 공공 주거 공고 (`extra_meta.category == PUBLIC_HOUSING`).
+  bool get isPublicHousing => extraMeta['category'] == 'PUBLIC_HOUSING';
 
-  /// Title for display; the [축제] badge replaces the server's "[축제] " prefix.
-  String get displayTitle =>
-      isFestival ? title.replaceFirst(_festivalPrefix, '') : title;
+  /// 공공임대 / 행복주택 / 청년주택; null unless [isPublicHousing].
+  HousingType? get housingType => isPublicHousing
+      ? HousingType.fromCode(extraMeta['housing_type'])
+      : null;
+
+  /// Parsed notice (모집 기간, 당첨자 발표, 문의, …); null unless
+  /// [isPublicHousing].
+  PublicHousingNotice? get publicNotice => isPublicHousing
+      ? PublicHousingNotice.parse(description, extraMeta)
+      : null;
+
+  static final _festivalPrefix = RegExp(r'^\s*\[축제\]\s*');
+  static final _publicHousingPrefix = RegExp(r'^\s*\[공공 ?혜택\]\s*');
+
+  /// Title for display; the [축제] / [공공 혜택] badges replace the server's
+  /// title prefixes.
+  String get displayTitle {
+    if (isFestival) return title.replaceFirst(_festivalPrefix, '');
+    if (isPublicHousing) return title.replaceFirst(_publicHousingPrefix, '');
+    return title;
+  }
 
   List<String> get gallery =>
       imageUrls.isEmpty ? [thumbnailUrl] : imageUrls;

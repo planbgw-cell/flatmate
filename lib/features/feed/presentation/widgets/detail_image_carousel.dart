@@ -12,11 +12,15 @@ class DetailImageCarousel extends StatelessWidget {
     required this.images,
     required this.index,
     required this.onPageChanged,
+    this.placeholder,
   });
 
   final List<String> images;
   final int index;
   final ValueChanged<int> onPageChanged;
+
+  /// Shown for a missing / broken image (e.g. image-less LH notices).
+  final Widget? placeholder;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,7 @@ class DetailImageCarousel extends StatelessWidget {
           itemBuilder: (context, i) {
             final url = images.isEmpty ? '' : images[i];
             if (url.isEmpty) {
-              return Container(color: AppColors.border);
+              return placeholder ?? Container(color: AppColors.border);
             }
             return CachedNetworkImage(
               key: ValueKey('detail-image-$i'),
@@ -40,7 +44,8 @@ class DetailImageCarousel extends StatelessWidget {
               fit: BoxFit.cover,
               memCacheWidth: 1440,
               placeholder: (_, _) => Container(color: AppColors.border),
-              errorWidget: (_, _, _) => const ImageErrorWidget(iconSize: 48),
+              errorWidget: (_, _, _) =>
+                  placeholder ?? const ImageErrorWidget(iconSize: 48),
             );
           },
         ),

@@ -278,7 +278,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('detail-source-card')), findsOneWidget);
-    expect(find.text('공공데이터 · 출처: 한국관광공사'), findsOneWidget);
+    expect(find.text('한국관광공사 · 공공데이터'), findsOneWidget);
     expect(find.byKey(const ValueKey('detail-festival-badge')), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('detail-title'))).data,

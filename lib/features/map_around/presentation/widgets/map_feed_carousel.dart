@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -6,8 +5,9 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../feed/domain/models/feed_extra_meta.dart';
 import '../../../feed/domain/models/feed_item.dart';
+import '../../../feed/presentation/widgets/feed_thumbnail.dart';
 import '../../../feed/presentation/widgets/festival_badge.dart';
-import 'map_feed_marker.dart';
+import '../../../feed/presentation/widgets/public_housing_badge.dart';
 
 /// Horizontal post cards under the map; the selected one has an orange border.
 class MapFeedCarousel extends StatelessWidget {
@@ -63,10 +63,9 @@ class _MapFeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumb = item.thumbnailUrl;
     final secondLine = item.isFestival
         ? FeedExtraMeta(item.category, item.extraMeta).eventPeriodLabel
-        : item.priceOrCondition;
+        : item.publicNotice?.rentSummary ?? item.priceOrCondition;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
       child: Material(
@@ -93,25 +92,7 @@ class _MapFeedCard extends StatelessWidget {
                   child: SizedBox(
                     width: 84,
                     height: 84,
-                    child: thumb.isEmpty
-                        ? Container(
-                            color: AppColors.surface,
-                            child: Icon(
-                              MapFeedMarker.iconFor(item),
-                              color: MapFeedMarker.colorFor(item),
-                            ),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: thumb,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 252,
-                            placeholder: (_, _) =>
-                                Container(color: AppColors.border),
-                            errorWidget: (_, _, _) => Container(
-                              color: AppColors.surface,
-                              child: const Icon(Icons.broken_image_outlined),
-                            ),
-                          ),
+                    child: FeedThumbnail(item: item, memCacheWidth: 252),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -129,6 +110,16 @@ class _MapFeedCard extends StatelessWidget {
                               child: FestivalBadge(
                                 key: ValueKey('map-festival-badge-${item.id}'),
                                 dense: true,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          if (item.isPublicHousing) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: HousingTypeBadge(
+                                key: ValueKey('map-housing-badge-${item.id}'),
+                                item: item,
                               ),
                             ),
                             const SizedBox(width: 4),

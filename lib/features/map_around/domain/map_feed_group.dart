@@ -56,6 +56,8 @@ List<MapFeedGroup> groupFeedsByPosition(List<FeedItem> items) {
 /// Short marker badge: "축제", the price line (truncated) or the category name.
 String markerLabel(FeedItem item) {
   if (item.isFestival) return '축제';
+  final housing = item.housingType;
+  if (housing != null) return housing.label;
   final price = item.priceOrCondition.trim();
   final text = price.isEmpty ? item.category.label : price;
   return text.length <= 9 ? text : '${text.substring(0, 8)}…';

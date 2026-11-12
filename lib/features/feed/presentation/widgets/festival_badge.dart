@@ -79,10 +79,10 @@ class SourceInfoCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(source, style: AppTypography.titleMedium),
+                Text('$source · 공공데이터', style: AppTypography.titleMedium),
                 const SizedBox(height: 2),
                 Text(
-                  '공공데이터 · 출처: $source',
+                  '출처: $source',
                   style: AppTypography.caption,
                 ),
               ],

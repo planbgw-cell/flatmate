@@ -1,9 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/common_widgets/badge_chip.dart';
-import '../../../../core/common_widgets/image_error_widget.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -12,8 +10,10 @@ import '../../domain/models/feed_extra_meta.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/models/region.dart';
 import '../providers/feed_provider.dart';
+import 'feed_thumbnail.dart';
 import 'festival_badge.dart';
 import 'like_heart.dart';
+import 'public_housing_badge.dart';
 import 'trade_status_badge.dart';
 
 class FeedCardItem extends ConsumerWidget {
@@ -49,6 +49,7 @@ class FeedCardItem extends ConsumerWidget {
         ? zoneOfAddress(item.address)
         : null;
     final region = zone == null ? '' : regionLabel(item.address);
+    final notice = item.publicNotice;
 
     return InkWell(
       onTap: onTap,
@@ -67,15 +68,10 @@ class FeedCardItem extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(8),
                 child: AspectRatio(
                   aspectRatio: 1,
-                  child: CachedNetworkImage(
+                  child: FeedThumbnail(
                     key: ValueKey('feed-thumb-${item.id}'),
-                    imageUrl: item.thumbnailUrl,
-                    fit: BoxFit.cover,
+                    item: item,
                     memCacheWidth: 270,
-                    placeholder: (_, _) => Container(color: AppColors.border),
-                    errorWidget: (_, _, _) => const ImageErrorWidget(
-                      iconSize: 28,
-                    ),
                   ),
                 ),
               ),
@@ -85,6 +81,10 @@ class FeedCardItem extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (notice != null) ...[
+                    PublicHousingBadges(item: item),
+                    const SizedBox(height: AppSpacing.xxs),
+                  ],
                   if (zone != null) ...[
                     Row(
                       key: ValueKey('festival-region-${item.id}'),
@@ -156,7 +156,27 @@ class FeedCardItem extends ConsumerWidget {
                       sourceName: item.sourceName!,
                     ),
                   const SizedBox(height: AppSpacing.xs),
-                  if (item.isFestival && festivalPeriod.isNotEmpty) ...[
+                  if (notice != null) ...[
+                    Text(
+                      notice.rentSummary,
+                      key: ValueKey('feed-rent-${item.id}'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (notice.applyPeriod case final period?)
+                      Text(
+                        '모집 $period',
+                        key: ValueKey('feed-apply-period-${item.id}'),
+                        style: AppTypography.caption.copyWith(
+                          color: PublicBenefitBadge.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ] else if (item.isFestival && festivalPeriod.isNotEmpty) ...[
                     Text(
                       festivalPeriod,
                       key: ValueKey('feed-period-${item.id}'),

@@ -1,12 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../core/common_widgets/image_error_widget.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../feed/domain/models/feed_item.dart';
+import '../../../feed/presentation/widgets/feed_thumbnail.dart';
 import '../../../feed/presentation/widgets/trade_status_badge.dart';
 
 /// Compact row for 내 판매글 / 관심목록 with a trailing action.
@@ -35,18 +33,10 @@ class MyFeedTile extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
-                imageUrl: item.thumbnailUrl,
+              child: SizedBox(
                 width: 64,
                 height: 64,
-                fit: BoxFit.cover,
-                memCacheWidth: 192,
-                placeholder: (_, _) => Container(color: AppColors.border),
-                errorWidget: (_, _, _) => const ImageErrorWidget(
-                  width: 64,
-                  height: 64,
-                  iconSize: 22,
-                ),
+                child: FeedThumbnail(item: item, memCacheWidth: 192),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),

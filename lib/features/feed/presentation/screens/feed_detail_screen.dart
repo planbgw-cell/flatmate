@@ -8,6 +8,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utils/external_url.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../chat/presentation/providers/chat_provider.dart';
@@ -20,7 +21,10 @@ import '../widgets/author_profile_card.dart';
 import '../widgets/category_detail_card.dart';
 import '../widgets/detail_bottom_bar.dart';
 import '../widgets/detail_image_carousel.dart';
+import '../widgets/feed_thumbnail.dart';
 import '../widgets/festival_badge.dart';
+import '../widgets/public_housing_badge.dart';
+import '../widgets/public_housing_notice_card.dart';
 import '../widgets/trade_status_badge.dart';
 
 /// Feed item detail — parallax gallery, trust profile, sticky CTA.
@@ -118,7 +122,8 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                     title: const Text('게시글 신고하기'),
                     onTap: () => Navigator.pop(context, 'report'),
                   ),
-                  if (item.authorId != null)
+                  // Public data (LH 마이홈, 한국관광공사) has no user to block.
+                  if (item.authorId != null && !item.isPublicData)
                     ListTile(
                       key: const ValueKey('menu-block'),
                       leading: const Icon(Icons.block, color: AppColors.error),
@@ -156,7 +161,45 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     }
   }
 
-  /// Public data (축제): 내주변 tab centered on the post, with it selected.
+  /// No 1:1 chat with an institution: [공고 사이트 이동] (apply URL) and
+  /// [지도에서 보기] (when located).
+  Widget _publicHousingBar(
+    FeedItem item,
+    PublicHousingNotice notice,
+    bool liked,
+  ) {
+    final url = notice.applyUrl;
+    final located = item.latitude != null && item.longitude != null;
+    final onApply = url == null ? null : () => _openApplySite(url);
+    final onMap = located ? () => _openOnMap(item) : null;
+    return DetailBottomBar(
+      priceOrCondition: notice.rentSummary,
+      liked: liked,
+      onLikeToggle: () => toggleFeedLike(context, ref, item.id),
+      ctaLabel: onApply != null ? '공고 사이트 이동' : '지도에서 보기',
+      ctaKey: ValueKey(onApply != null ? 'detail-apply-cta' : 'detail-map-cta'),
+      onCtaPressed: onApply ?? onMap,
+      secondaryLabel: onApply != null && onMap != null ? '지도에서 보기' : null,
+      secondaryKey: const ValueKey('detail-map-cta'),
+      onSecondaryPressed: onApply != null ? onMap : null,
+    );
+  }
+
+  /// 공공 주거 공고: the notice / 청약 site in the external browser.
+  Future<void> _openApplySite(String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.tryParse(url);
+    final opened = uri != null &&
+        await ref.read(externalUrlLauncherProvider)(uri);
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('브라우저를 열 수 없어요.')),
+      );
+    }
+  }
+
+  /// Public data (축제, 공공 주거): 내주변 tab centered on the post, with it
+  /// selected.
   void _openOnMap(FeedItem item) {
     if (item.latitude == null || item.longitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -202,6 +245,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
   Widget build(BuildContext context) {
     final item = ref.watch(feedItemProvider(widget.item));
     final fav = ref.watch(favoriteItemProvider(item.id));
+    final notice = item.publicNotice;
     final collapsed = _collapseT;
     final iconColor =
         Color.lerp(Colors.white, AppColors.textPrimary, collapsed)!;
@@ -256,6 +300,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                   images: item.gallery,
                   index: _galleryIndex,
                   onPageChanged: (i) => setState(() => _galleryIndex = i),
+                  placeholder: FeedPlaceholder(item: item, large: true),
                 ),
               ),
             ),
@@ -285,6 +330,13 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       style: AppTypography.bodyMedium,
                     ),
                     const SizedBox(height: AppSpacing.xs),
+                    if (item.isPublicHousing) ...[
+                      PublicHousingBadges(
+                        key: const ValueKey('detail-housing-badges'),
+                        item: item,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -317,14 +369,22 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Text(
-                      item.description.isEmpty
-                          ? '상세 설명이 곧 등록됩니다.'
-                          : item.description,
-                      style: AppTypography.bodyLarge.copyWith(height: 1.55),
-                    ),
-                    if (item.detailMeta.isNotEmpty ||
-                        item.extraMeta.isNotEmpty) ...[
+                    // The notice card carries every line of a 공공 주거 body.
+                    if (notice != null)
+                      PublicHousingNoticeCard(
+                        notice: notice,
+                        onOpenUrl: _openApplySite,
+                      )
+                    else
+                      Text(
+                        item.description.isEmpty
+                            ? '상세 설명이 곧 등록됩니다.'
+                            : item.description,
+                        style: AppTypography.bodyLarge.copyWith(height: 1.55),
+                      ),
+                    if (notice == null &&
+                        (item.detailMeta.isNotEmpty ||
+                            item.extraMeta.isNotEmpty)) ...[
                       const SizedBox(height: AppSpacing.lg),
                       CategoryDetailCard(item: item),
                     ],
@@ -346,17 +406,19 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                           key: const ValueKey('detail-like-count'),
                           style: AppTypography.caption,
                         ),
-                        const SizedBox(width: AppSpacing.lg),
-                        const Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 16,
-                          color: AppColors.textTertiary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '채팅 ${item.chatCount}',
-                          style: AppTypography.caption,
-                        ),
+                        if (!item.isPublicData) ...[
+                          const SizedBox(width: AppSpacing.lg),
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 16,
+                            color: AppColors.textTertiary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '채팅 ${item.chatCount}',
+                            style: AppTypography.caption,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -366,7 +428,9 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
             ),
           ],
         ),
-        bottomNavigationBar: item.isPublicData
+        bottomNavigationBar: notice != null
+            ? _publicHousingBar(item, notice, fav.isFavorite)
+            : item.isPublicData
             ? DetailBottomBar(
                 priceOrCondition: FeedExtraMeta(item.category, item.extraMeta)
                     .eventPeriodLabel,

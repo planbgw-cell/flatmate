@@ -26,6 +26,11 @@ abstract final class ExtraMetaKeys {
   static const category = 'category';
   static const eventStartDate = 'event_start_date';
   static const eventEndDate = 'event_end_date';
+
+  // REAL_ESTATE collected from LH 마이홈 etc. — category PUBLIC_HOUSING;
+  // reuses deposit / monthly_rent (만원) and the event dates (모집 기간).
+  static const housingType = 'housing_type';
+  static const applyUrl = 'apply_url';
 }
 
 enum RoomType {
