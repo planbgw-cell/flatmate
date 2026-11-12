@@ -11,6 +11,7 @@ import 'package:flatmate_app/features/feed/data/repositories/mock_feed_repositor
 import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
 import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
+import 'package:flatmate_app/features/feed/presentation/screens/feed_screen.dart';
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
 import 'package:flatmate_app/features/location/domain/repositories/location_repository.dart';
 import 'package:flatmate_app/features/location/presentation/providers/location_provider.dart';
@@ -80,17 +81,32 @@ class _Feeds extends MockFeedRepository {
     return category == FeedCategory.community.name ? community : around;
   }
 
-  final localNewsCalls = <({int locationId, PublicScope scope})>[];
+  final scopedCalls = <({
+    String category,
+    int locationId,
+    PublicScope scope,
+    LocationItem? origin,
+    FeedSort sort,
+  })>[];
   List<FeedItem> zone = const [];
 
   @override
-  Future<List<FeedItem>> fetchLocalNews({
+  Future<List<FeedItem>> fetchScopedFeeds({
+    required String category,
     required int locationId,
     PublicScope scope = PublicScope.sigungu,
+    LocationItem? origin,
+    FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
   }) async {
-    localNewsCalls.add((locationId: locationId, scope: scope));
+    scopedCalls.add((
+      category: category,
+      locationId: locationId,
+      scope: scope,
+      origin: origin,
+      sort: sort,
+    ));
     if (page > 1) return const [];
     return scope == PublicScope.zone ? zone : community;
   }
@@ -102,8 +118,12 @@ class _Feeds extends MockFeedRepository {
   }
 }
 
-/// Reverse-geo stand-in: local dong ids resolve to server dong 15 (경기도).
+/// Reverse-geo stand-in: local dong ids resolve to [resolved] (default: server
+/// dong 15, 경기도).
 class _Locations implements LocationRepository {
+  _Locations({this.resolved = _yatapServer});
+
+  final LocationItem? resolved;
   final reverseGeoCalls = <(double, double)>[];
 
   @override
@@ -112,16 +132,18 @@ class _Locations implements LocationRepository {
   @override
   Future<LocationItem?> getReverseGeo(double lat, double lng) async {
     reverseGeoCalls.add((lat, lng));
-    return const LocationItem(
-      id: '15',
-      cityName: '경기도',
-      districtName: '성남시 분당구',
-      dongName: '야탑1동',
-      latitude: 37.41205,
-      longitude: 127.13027,
-    );
+    return resolved;
   }
 }
+
+const _yatapServer = LocationItem(
+  id: '15',
+  cityName: '경기도',
+  districtName: '성남시 분당구',
+  dongName: '야탑1동',
+  latitude: 37.41205,
+  longitude: 127.13027,
+);
 
 const _yatap = LocationItem(
   id: '15',
@@ -423,7 +445,11 @@ void main() {
     expect(locations.reverseGeoCalls, [
       (kDefaultLocation.latitude, kDefaultLocation.longitude),
     ]);
-    expect(feeds.localNewsCalls, [(locationId: 15, scope: PublicScope.sigungu)]);
+    expect(
+      feeds.scopedCalls.map((c) => (c.category, c.locationId, c.scope)),
+      [(FeedCategory.community.name, 15, PublicScope.sigungu)],
+    );
+    expect(feeds.scopedCalls.single.origin, isNull);
     expect(feeds.calls, isEmpty, reason: 'no lat/lng radius query');
     final sigungu = tester.widget<ChoiceChip>(
       find.descendant(
@@ -480,17 +506,17 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(feeds.localNewsCalls.single, (
-      locationId: 15,
-      scope: PublicScope.sigungu,
-    ));
+    expect(
+      (feeds.scopedCalls.single.locationId, feeds.scopedCalls.single.scope),
+      (15, PublicScope.sigungu),
+    );
 
     await tester.tap(find.byKey(const ValueKey('community-scope-zone')));
     await tester.pumpAndSettle();
-    expect(feeds.localNewsCalls.last, (
-      locationId: 15,
-      scope: PublicScope.zone,
-    ));
+    expect(
+      (feeds.scopedCalls.last.locationId, feeds.scopedCalls.last.scope),
+      (15, PublicScope.zone),
+    );
     final region = find.byKey(const ValueKey('festival-region-301'));
     expect(region, findsOneWidget);
     expect(
@@ -506,8 +532,99 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('community-scope-sigungu')));
     await tester.pumpAndSettle();
-    expect(feeds.localNewsCalls.last.scope, PublicScope.sigungu);
+    expect(feeds.scopedCalls.last.scope, PublicScope.sigungu);
     expect(find.byKey(const ValueKey('community-empty')), findsOneWidget);
+  });
+
+  group('home [부동산/주거] → 권역 조회', () {
+    test('housing chip: zone by reverse-geo dong id + origin · sort; '
+        '[전체]: radius', () async {
+      final feeds = _Feeds()..zone = [_item('60', category: FeedCategory.housing)];
+      final locations = _Locations();
+      final container = ProviderContainer(
+        overrides: _overrides(feeds, locations: locations),
+      );
+      addTearDown(container.dispose);
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.housing.name;
+      container.read(feedSortProvider.notifier).state = FeedSort.distance;
+
+      final state = await container.read(feedListProvider.future);
+      expect(state.items.map((e) => e.id), ['60']);
+      expect(feeds.calls, isEmpty, reason: 'no lat/lng radius query');
+      final call = feeds.scopedCalls.single;
+      expect(call.category, FeedCategory.housing.name);
+      expect(call.locationId, 15, reason: 'guest dong → reverse-geo id');
+      expect(call.scope, PublicScope.zone);
+      expect(call.sort, FeedSort.distance);
+      expect(call.origin?.latitude, kDefaultLocation.latitude);
+      expect(locations.reverseGeoCalls, hasLength(1));
+
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.all.name;
+      await container.read(feedListProvider.future);
+      expect(feeds.scopedCalls, hasLength(1));
+      expect(feeds.calls.single.category, FeedCategory.all.name);
+      expect(feeds.calls.single.radiusKm, 3);
+    });
+
+    test('numeric dong id is used as is (no reverse-geo)', () async {
+      final feeds = _Feeds();
+      final locations = _Locations();
+      final container = ProviderContainer(
+        overrides: [
+          ..._overrides(feeds, locations: locations),
+          currentLocationProvider.overrideWith((ref) => _yatap),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.housing.name;
+      await container.read(feedListProvider.future);
+      expect(feeds.scopedCalls.single.locationId, 15);
+      expect(feeds.scopedCalls.single.origin?.id, '15');
+      expect(locations.reverseGeoCalls, isEmpty);
+    });
+
+    test('no server dong → falls back to the radius query', () async {
+      final feeds = _Feeds();
+      final container = ProviderContainer(
+        overrides: _overrides(feeds, locations: _Locations(resolved: null)),
+      );
+      addTearDown(container.dispose);
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.housing.name;
+      await container.read(feedListProvider.future);
+      expect(feeds.scopedCalls, isEmpty);
+      expect(feeds.calls.single.category, FeedCategory.housing.name);
+    });
+
+    testWidgets('home caption: 수도권(서울·인천·경기) 공공 주거 공고', (tester) async {
+      final feeds = _Feeds();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ..._overrides(feeds),
+            selectedCategoryProvider
+                .overrideWith((ref) => FeedCategory.housing.name),
+          ],
+          child: const MaterialApp(home: FeedScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('feed-zone-caption'))).data,
+        '수도권(서울·인천·경기) 공공 주거 공고를 함께 보여드려요',
+      );
+      expect(feeds.scopedCalls.single.scope, PublicScope.zone);
+
+      final container =
+          ProviderScope.containerOf(tester.element(find.byType(FeedScreen)));
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.all.name;
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('feed-zone-caption')), findsNothing);
+    });
   });
 
   test('new posts carry the server dong id (location_id)', () {

@@ -1,4 +1,4 @@
-// On-device E2E (guest): LH 마이홈 공공 주거 공고 — 홈 [부동산/주거] card
+// On-device E2E (guest): LH 마이홈 공공 주거 공고 (동네 권역) — 홈 [부동산/주거] card
 // ([공공 혜택] + 유형, 임대 조건, 출처, 유형 placeholder) → detail (출처 카드,
 // 공고 정보, no 채팅/차단) → [공고 사이트 이동] (apply_url) → [지도에서 보기].
 //
@@ -15,7 +15,6 @@ import 'package:flatmate_app/features/feed/data/mappers/feed_item_mapper.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_detail_screen.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_screen.dart';
 import 'package:flatmate_app/features/feed/presentation/widgets/feed_visual.dart';
-import 'package:flatmate_app/features/location/domain/models/location_item.dart';
 import 'package:flatmate_app/features/location/presentation/providers/location_provider.dart';
 import 'package:flatmate_app/features/map_around/presentation/providers/map_around_provider.dart';
 import 'package:flatmate_app/features/map_around/presentation/screens/map_around_screen.dart';
@@ -79,31 +78,6 @@ void main() {
         reason: 'Run with --dart-define=USE_MOCK_API=false');
     await sl<TokenStorage>().clear();
 
-    // A located LH notice with an apply URL and a server dong.
-    final dio = Dio(BaseOptions(baseUrl: AppConfig.devServerBaseUrl));
-    final response = await dio.get<Map<String, dynamic>>(
-      '/feeds',
-      queryParameters: {'feed_type': 'REAL_ESTATE', 'limit': 100},
-    );
-    final row = (response.data!['items'] as List)
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .firstWhere(
-          (e) =>
-              e['is_public_data'] == true &&
-              e['lat'] != null &&
-              e['location_id'] != null &&
-              ((e['extra_meta'] as Map?)?['apply_url'] as String?)
-                      ?.startsWith('https://') ==
-                  true,
-        );
-    final notice = feedItemFromJson(row);
-    final id = notice.id;
-    final applyUrl = notice.publicNotice!.applyUrl!;
-    expect(notice.isPublicHousing, isTrue);
-    expect(notice.thumbnailUrl, isEmpty);
-    _step('서버 공고 $id [${notice.housingType!.label}] "${notice.displayTitle}" · '
-        '${notice.address} · 이미지 없음');
-
     final launched = <Uri>[];
     await tester.pumpWidget(
       ProviderScope(
@@ -121,14 +95,38 @@ void main() {
     await _pumpUntil(tester, find.byType(FeedScreen));
     final container =
         ProviderScope.containerOf(tester.element(find.byType(FeedScreen)));
-    container.read(currentLocationProvider.notifier).state = LocationItem(
-      id: row['location_id'].toString(),
-      cityName: '',
-      districtName: '',
-      dongName: notice.neighborhood,
-      latitude: notice.latitude!,
-      longitude: notice.longitude!,
+    final dong = (await container.read(serverDongProvider.future))!;
+
+    // A located LH notice with an apply URL in the dong's 권역 (what the
+    // [부동산/주거] chip lists).
+    final dio = Dio(BaseOptions(baseUrl: AppConfig.devServerBaseUrl));
+    final response = await dio.get<Map<String, dynamic>>(
+      '/feeds',
+      queryParameters: {
+        'feed_type': 'REAL_ESTATE',
+        'location_id': int.parse(dong.id),
+        'public_scope': 'zone',
+        'limit': 100,
+      },
     );
+    final row = (response.data!['items'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .firstWhere(
+          (e) =>
+              e['source'] == 'LH_MYHOME' &&
+              e['lat'] != null &&
+              ((e['extra_meta'] as Map?)?['apply_url'] as String?)
+                      ?.startsWith('https://') ==
+                  true,
+        );
+    final notice = feedItemFromJson(row);
+    final id = notice.id;
+    final applyUrl = notice.publicNotice!.applyUrl!;
+    expect(notice.isPublicHousing, isTrue);
+    expect(notice.thumbnailUrl, isEmpty);
+    _step('동네 ${dong.dongName}(서버 id ${dong.id}) 권역 공고 $id '
+        '[${notice.housingType!.label}] "${notice.displayTitle}" · '
+        '${notice.address} · 이미지 없음');
 
     // 1) 홈 [부동산/주거] card.
     await _tap(tester, find.text('부동산/주거').first);

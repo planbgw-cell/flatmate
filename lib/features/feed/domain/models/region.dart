@@ -90,6 +90,14 @@ String regionLabel(String? address) {
   return district.isEmpty ? sido : '$sido $district';
 }
 
+/// Public notice region: "경기 양평군" with a 시·군·구, else the 시·도 as
+/// written for 광역 notices ("서울특별시"); empty without a 시·도.
+String noticeRegionLabel(String? address) {
+  final label = regionLabel(address);
+  if (label.isEmpty || label.contains(' ')) return label;
+  return (address ?? '').trim().split(RegExp(r'\s+')).first;
+}
+
 /// 권역 of an address's 시·도, e.g. "경기도 가평군 …" → "수도권".
 String? zoneOfAddress(String? address) {
   final first = (address ?? '').trim().split(RegExp(r'\s+')).first;

@@ -43,18 +43,25 @@ class DioFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<List<FeedItem>> fetchLocalNews({
+  Future<List<FeedItem>> fetchScopedFeeds({
+    required String category,
     required int locationId,
     PublicScope scope = PublicScope.sigungu,
+    LocationItem? origin,
+    FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
   }) async {
     final response = await _api.get<dynamic>(
       '/feeds',
       queryParameters: {
-        'feed_type': feedTypeForCategoryKey(FeedCategory.community.name),
+        'feed_type': ?feedTypeForCategoryKey(category),
         'location_id': locationId,
         'public_scope': scope.name,
+        // Distance only; no radius_m so the scope is not narrowed.
+        if (origin != null) 'lat': origin.latitude,
+        if (origin != null) 'lng': origin.longitude,
+        'sort': origin == null ? FeedSort.latest.name : sort.name,
         'page': page,
         'limit': pageSize,
       },

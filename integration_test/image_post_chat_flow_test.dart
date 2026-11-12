@@ -29,8 +29,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:integration_test/integration_test.dart';
 
-const _password = 'Flatmate123!';
-const _peerEmail = 'qa.buyer@example.com';
+import 'support/qa_accounts.dart';
+
+const _password = qaPassword;
 
 final _log = <String>[];
 
@@ -257,13 +258,12 @@ void main() {
     await _pumpUntil(tester, find.byType(FeedScreen));
 
     // 3) Peer B asks about the listing.
-    final login = await dio.post<Map<String, dynamic>>(
-      '/auth/login',
-      data: {'email': _peerEmail, 'password': _password},
+    final buyer = await signUpQaAccount(
+      dio,
+      email: 'qa.imgbuyer$stamp@example.com',
+      nickname: 'QA구매${stamp % 10000}',
     );
-    final auth = Options(
-      headers: {'Authorization': 'Bearer ${login.data!['access_token']}'},
-    );
+    final auth = buyer.auth;
     final room = (await dio.post<Map<String, dynamic>>(
       '/chats/rooms',
       data: {'peer_id': int.parse(authorId), 'feed_id': int.parse(post.id)},

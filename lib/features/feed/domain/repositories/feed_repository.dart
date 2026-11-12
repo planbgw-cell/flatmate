@@ -29,12 +29,16 @@ abstract class FeedRepository {
     FeedSort sort = FeedSort.latest,
   });
 
-  /// 동네소식 by server dong (`GET /feeds?feed_type=LOCAL_NEWS&location_id=`):
-  /// posts of that dong plus public-data posts within [scope]. No lat/lng —
-  /// the server ignores `public_scope` when coordinates are sent.
-  Future<List<FeedItem>> fetchLocalNews({
+  /// [category] posts by server dong (`GET /feeds?location_id=&public_scope=`):
+  /// posts of that dong plus public data (축제 / 공공 주거) within [scope],
+  /// including notices without coordinates. [origin] only fills `distance_m`
+  /// (and enables `sort=distance`); it does not narrow the scope.
+  Future<List<FeedItem>> fetchScopedFeeds({
+    required String category,
     required int locationId,
     PublicScope scope = PublicScope.sigungu,
+    LocationItem? origin,
+    FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
   });

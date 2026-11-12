@@ -3,8 +3,9 @@
 //   flutter test integration_test/realtime_chat_flow_test.dart \
 //     -d <device-id> --dart-define=USE_MOCK_API=false
 //
-// The second participant (QA seller) runs inside the test over its own
-// WebSocket, so the phone UI is account A and the socket is account B.
+// The second participant (a QA seller created per run, with a 정자동 listing)
+// runs inside the test over its own WebSocket, so the phone UI is account A
+// and the socket is account B.
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -22,10 +23,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-const _sellerEmail = 'qa.seller@example.com';
-const _sellerNickname = 'QAseller';
-const _password = 'Flatmate123!';
-const _sellerPost = '정자동 테스트 원룸';
+import 'support/qa_accounts.dart';
+
+const _password = qaPassword;
 
 final _log = <String>[];
 
@@ -172,6 +172,22 @@ void main() {
     final email = 'qa.rt$stamp@example.com';
     final nickname = 'QA실시간${stamp % 10000}';
 
+    // Account B (seller) + its 정자동 listing over REST.
+    final dio = Dio(BaseOptions(baseUrl: AppConfig.devServerBaseUrl));
+    final seller = await signUpQaAccount(
+      dio,
+      email: 'qa.rtseller$stamp@example.com',
+      nickname: 'QA판매${stamp % 10000}',
+    );
+    final sellerNickname = seller.nickname;
+    final sellerPost = '[RT $stamp] 정자동 테스트 원룸';
+    await createQaRoomPost(
+      dio,
+      seller,
+      title: sellerPost,
+      dong: await findServerDong(dio, query: '정자', name: '성남시 분당구 정자동'),
+    );
+
     await tester.pumpWidget(ProviderScope(child: FlatmateApp()));
 
     // Account A: sign up on the phone (auto login → access + refresh token).
@@ -210,13 +226,8 @@ void main() {
     _step('A($nickname, id=$myId) 가입·로그인 → access/refresh 토큰 보안저장소 저장');
 
     // Account B (seller) over REST + WebSocket.
-    final dio = Dio(BaseOptions(baseUrl: AppConfig.devServerBaseUrl));
-    final login = await dio.post<Map<String, dynamic>>(
-      '/auth/login',
-      data: {'email': _sellerEmail, 'password': _password},
-    );
-    final peer = _Peer(dio, login.data!['access_token'] as String);
-    _step('B($_sellerNickname) 로그인');
+    final peer = _Peer(dio, seller.token);
+    _step('B($sellerNickname, API 가입) · 글 "$sellerPost"');
 
     // Open the seller's post → chat room (A's socket connects on entry).
     await _tap(tester, find.byKey(const ValueKey('feed-location-button')));
@@ -231,15 +242,15 @@ void main() {
     await _pumpUntil(tester, find.text('성남시 분당구 정자동'));
     await _tap(tester, find.text('성남시 분당구 정자동'));
     await _tap(tester, find.byIcon(Icons.close));
-    await _scrollFeedTo(tester, find.textContaining(_sellerPost));
-    await _tap(tester, find.textContaining(_sellerPost));
+    await _scrollFeedTo(tester, find.textContaining(sellerPost));
+    await _tap(tester, find.textContaining(sellerPost));
     await _pumpUntil(tester, find.text('채팅으로 문의하기'));
     await _tap(tester, find.text('채팅으로 문의하기'));
     await _pumpUntil(tester, find.byType(ChatRoomScreen));
     await _pumpUntil(tester, find.text('실시간 연결됨'));
     final roomId =
         tester.widget<ChatRoomScreen>(find.byType(ChatRoomScreen)).roomId;
-    expect(find.text(_sellerNickname), findsWidgets);
+    expect(find.text(sellerNickname), findsWidgets);
     await peer.connect(roomId);
     _step('채팅방 room=$roomId · A/B 모두 WebSocket connected');
 
@@ -297,7 +308,7 @@ void main() {
     final beforeRest = tokens.accessToken;
     tokens.debugCorruptAccessToken();
     await _tap(tester, find.text('채팅').first);
-    await _pumpUntil(tester, find.text(_sellerNickname));
+    await _pumpUntil(tester, find.text(sellerNickname));
     expect(tokens.accessToken, isNot(beforeRest));
     expect(tokens.accessToken, startsWith('eyJ'));
     expect(tokens.hasSession, isTrue);
@@ -319,14 +330,14 @@ void main() {
       matching: find.byType(InkWell),
     );
     expect(
-      find.descendant(of: tile.first, matching: find.text(_sellerNickname)),
+      find.descendant(of: tile.first, matching: find.text(sellerNickname)),
       findsOneWidget,
     );
     expect(
       find.descendant(of: tile.first, matching: find.text('2')),
       findsOneWidget,
     );
-    _step('채팅 목록: 상대 닉네임 "$_sellerNickname" · 안 읽음 뱃지 2 · 마지막 메시지 표시');
+    _step('채팅 목록: 상대 닉네임 "$sellerNickname" · 안 읽음 뱃지 2 · 마지막 메시지 표시');
 
     // WebSocket with an "expired" token: close 4401 → refresh → reconnect.
     final beforeWs = tokens.accessToken;

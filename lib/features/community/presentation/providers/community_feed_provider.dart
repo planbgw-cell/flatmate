@@ -5,23 +5,11 @@ import '../../../block_report/presentation/providers/blocked_users_provider.dart
 import '../../../feed/domain/models/feed_item.dart';
 import '../../../feed/domain/repositories/feed_repository.dart';
 import '../../../feed/presentation/providers/feed_provider.dart';
-import '../../../location/domain/models/location_item.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 
 /// 동네소식 chips: [우리 동네] (`sigungu`, default) / [우리 권역 축제] (`zone`).
 final communityScopeProvider =
     StateProvider<PublicScope>((ref) => PublicScope.sigungu);
-
-/// Current dong as a server location (numeric `location_id`, 시·도 in
-/// `cityName`). Local / mock dongs (e.g. the guest default) are resolved via
-/// reverse-geo once per dong; null when the server has no matching dong.
-final serverDongProvider = FutureProvider<LocationItem?>((ref) async {
-  final dong = ref.watch(currentLocationProvider);
-  if (int.tryParse(dong.id) != null) return dong;
-  return ref
-      .read(locationRepositoryProvider)
-      .getReverseGeo(dong.latitude, dong.longitude);
-});
 
 /// 동네소식 (`feed_type=LOCAL_NEWS`) of the current dong by [PublicScope],
 /// paged.
@@ -36,7 +24,8 @@ class CommunityFeedNotifier extends AsyncNotifier<FeedListState> {
       throw StateError('동네 정보를 확인할 수 없어요. 동네를 다시 설정해 주세요.');
     }
     final blocked = readBlockedAuthorIds(ref);
-    final items = await ref.read(feedRepositoryProvider).fetchLocalNews(
+    final items = await ref.read(feedRepositoryProvider).fetchScopedFeeds(
+          category: FeedCategory.community.name,
           locationId: locationId,
           scope: scope,
           page: page,

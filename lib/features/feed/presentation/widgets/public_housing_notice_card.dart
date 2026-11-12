@@ -5,7 +5,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/feed_item.dart';
 
-/// 공고 정보: 모집 기간 · 당첨자 발표 · 문의 · 신청 URL, then the notice details.
+/// 공고 정보: 모집 기간 · 당첨자 발표 · 문의 · 신청 URL, then the notice details
+/// (경기도 단지: 입주 대상 · 공급세대 · 준공일 · 안내).
 class PublicHousingNoticeCard extends StatelessWidget {
   const PublicHousingNoticeCard({
     super.key,
@@ -19,6 +20,14 @@ class PublicHousingNoticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = notice.rows;
+    final seen = <String, int>{};
+    final rowKeys = [
+      for (final row in rows)
+        switch (seen.update(row.label, (n) => n + 1, ifAbsent: () => 1)) {
+          1 => 'housing-row-${row.label}',
+          final n => 'housing-row-${row.label}-$n',
+        },
+    ];
     return Container(
       key: const ValueKey('detail-card-housing'),
       width: double.infinity,
@@ -36,7 +45,7 @@ class PublicHousingNoticeCard extends StatelessWidget {
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0) const SizedBox(height: AppSpacing.sm),
             Row(
-              key: ValueKey('housing-row-${rows[i].label}'),
+              key: ValueKey(rowKeys[i]),
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(

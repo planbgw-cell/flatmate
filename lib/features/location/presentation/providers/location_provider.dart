@@ -102,6 +102,17 @@ final locationRepositoryProvider = Provider<LocationRepository>((ref) {
   return sl<LocationRepository>();
 });
 
+/// Current dong as a server location (numeric `location_id`, 시·도 in
+/// `cityName`). Local / mock dongs (e.g. the guest default) are resolved via
+/// reverse-geo once per dong; null when the server has no matching dong.
+final serverDongProvider = FutureProvider<LocationItem?>((ref) async {
+  final dong = ref.watch(currentLocationProvider);
+  if (int.tryParse(dong.id) != null) return dong;
+  return ref
+      .read(locationRepositoryProvider)
+      .getReverseGeo(dong.latitude, dong.longitude);
+});
+
 /// Dong search via [LocationRepository] (Mock catalog or `GET /locations?q=`).
 final locationSearchResultsProvider =
     FutureProvider<List<LocationItem>>((ref) async {

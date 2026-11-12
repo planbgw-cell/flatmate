@@ -5,6 +5,7 @@ import 'package:flatmate_app/features/auth/presentation/providers/auth_provider.
 import 'package:flatmate_app/features/feed/data/mappers/feed_item_mapper.dart';
 import 'package:flatmate_app/features/feed/data/repositories/mock_feed_repository.dart';
 import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
+import 'package:flatmate_app/features/feed/domain/models/region.dart';
 import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_detail_screen.dart';
@@ -99,6 +100,81 @@ Map<String, dynamic> _rentalOut() => {
       'published_at': '2026-11-11T11:51:40Z',
     };
 
+const _seoulApplyUrl =
+    'https://apply.lh.or.kr/lhapply/apply/wt/wrtanc/selectWrtancInfo.do?panId=2015122300019550';
+
+/// LH 서울 광역 전세임대 (시·도 전체 대상, no coordinates).
+Map<String, dynamic> _seoulWideOut() => {
+      'id': 308,
+      'feed_type': 'REAL_ESTATE',
+      'source': 'LH_MYHOME',
+      'is_public_data': true,
+      'source_name': 'LH 마이홈',
+      'title': '[공공 혜택] 2026년 신혼·신생아 전세임대 I 입주자 수시모집 공고',
+      'content': '공급기관: LH\n'
+          '공급유형: 전세임대\n'
+          '주택유형: 아파트\n'
+          '공고일: 2026.03.24\n'
+          '모집 기간: 2026.03.24 ~ 2026.12.31\n'
+          '당첨자 발표: 2027.02.26\n'
+          '문의: LH 콜센터 : 1600-1004 (평일 : 09:00 ~ 18:00)\n'
+          '\n'
+          '주소: 서울특별시\n'
+          '신청: $_seoulApplyUrl\n'
+          '출처: LH 마이홈',
+      'location_id': null,
+      'address': '서울특별시',
+      'lat': null,
+      'lng': null,
+      'extra_meta': {
+        'deposit': 0,
+        'category': 'PUBLIC_HOUSING',
+        'apply_url': _seoulApplyUrl,
+        'housing_type': 'PUBLIC_RENTAL',
+        'monthly_rent': 0,
+        'event_end_date': '2026-12-31',
+        'event_start_date': '2026-03-24',
+      },
+      'price_text': null,
+      'image_urls': const <String>[],
+      'thumbnail_url': null,
+      'published_at': '2026-11-12T04:46:45Z',
+    };
+
+/// 경기도 행복주택 단지 정보 (GG_HOUSING: no apply_url, no 모집 기간).
+Map<String, dynamic> _ggComplexOut() => {
+      'id': 344,
+      'feed_type': 'REAL_ESTATE',
+      'source': 'GG_HOUSING',
+      'is_public_data': true,
+      'source_name': '경기도',
+      'title': '[공공 혜택] 경기행복주택 양평 공흥',
+      'content': '경기도 행복주택 (경기주택도시공사)\n'
+          '입주 대상: 청년\n'
+          '공급세대: 40세대\n'
+          '준공일: 2019.01.28\n'
+          '\n'
+          '주소: 경기도 양평군 양평읍 남북로 70\n'
+          '출처: 경기도',
+      'location_id': 144,
+      'address': '경기도 양평군 양평읍 남북로 70',
+      'lat': 37.4889516711391,
+      'lng': 127.502183615536,
+      'extra_meta': {
+        'deposit': 0,
+        'category': 'PUBLIC_HOUSING',
+        'apply_url': null,
+        'housing_type': 'HAPPY_HOUSE',
+        'monthly_rent': 0,
+        'event_end_date': null,
+        'event_start_date': null,
+      },
+      'price_text': null,
+      'image_urls': const <String>[],
+      'thumbnail_url': null,
+      'published_at': '2026-11-12T04:49:24Z',
+    };
+
 class _Feeds extends MockFeedRepository {
   @override
   Future<List<FeedItem>> fetchFeeds({
@@ -162,6 +238,67 @@ void main() {
         feedItemFromJson(_rentalOut()).publicNotice!.rentSummary,
         '임대 조건은 공고문 참고',
       );
+    });
+
+    test('GG_HOUSING: 안내 행 · 입주 대상 · 공급세대 · 준공일, no 출처 row', () {
+      final item = feedItemFromJson(_ggComplexOut());
+      expect(item.isPublicHousing, isTrue);
+      expect(item.sourceName, '경기도');
+      final notice = item.publicNotice!;
+      expect(notice.target, '청년');
+      expect(notice.households, '40세대');
+      expect(notice.notes, ['경기도 행복주택 (경기주택도시공사)']);
+      expect(notice.applyUrl, isNull);
+      expect(notice.applyPeriod, isNull);
+      expect(
+        notice.rows.map((r) => (r.label, r.value)),
+        [
+          ('주소', '경기도 양평군 양평읍 남북로 70'),
+          ('입주 대상', '청년'),
+          ('공급세대', '40세대'),
+          ('준공일', '2019.01.28'),
+          ('안내', '경기도 행복주택 (경기주택도시공사)'),
+        ],
+      );
+    });
+
+    test('rentSummary 3단계: 입주 대상 · 공급세대 before the fallback', () {
+      expect(
+        feedItemFromJson(_ggComplexOut()).publicNotice!.rentSummary,
+        '청년 · 40세대',
+      );
+      final onlyUnits = _ggComplexOut()
+        ..['content'] = '공급세대: 120세대\n출처: 경기도';
+      expect(
+        feedItemFromJson(onlyUnits).publicNotice!.rentSummary,
+        '120세대',
+      );
+      final rentWins = _ggComplexOut()
+        ..['extra_meta'] = {
+          ...(_ggComplexOut()['extra_meta'] as Map<String, dynamic>),
+          'deposit': 1500,
+        };
+      expect(
+        feedItemFromJson(rentWins).publicNotice!.rentSummary,
+        '보증금 1,500만',
+      );
+    });
+
+    test('LH rows keep known keys only (no 안내 / 출처)', () {
+      final labels =
+          feedItemFromJson(_happyHouseOut()).publicNotice!.rows.map((r) => r.label);
+      expect(labels, isNot(contains('안내')));
+      expect(labels, isNot(contains('출처')));
+    });
+
+    test('noticeRegionLabel: 시·군·구 short form, 광역 = 시·도 as written', () {
+      expect(noticeRegionLabel('경기도 양평군 양평읍 남북로 70'), '경기 양평군');
+      expect(noticeRegionLabel('서울특별시'), '서울특별시');
+      expect(noticeRegionLabel('인천광역시'), '인천광역시');
+      expect(noticeRegionLabel('서울특별시 종로구 세종대로 1'), '서울 종로구');
+      expect(noticeRegionLabel('세종특별자치시 한누리대로 2130'), '세종특별자치시');
+      expect(noticeRegionLabel(''), '');
+      expect(noticeRegionLabel(null), '');
     });
 
     test('app posts are not public housing', () {
@@ -302,5 +439,79 @@ void main() {
     expect(find.text('지도에서 보기'), findsNothing);
     expect(find.text('임대 조건은 공고문 참고'), findsOneWidget);
     expect(find.byIcon(Icons.location_city), findsOneWidget);
+  });
+
+  Future<void> pumpCard(WidgetTester tester, FeedItem item) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: overrides(),
+        child: MaterialApp(
+          home: Scaffold(body: FeedCardItem(item: item, onTap: () {})),
+        ),
+      ),
+    );
+    await tester.pump();
+  }
+
+  String textOf(WidgetTester tester, String key) =>
+      tester.widget<Text>(find.byKey(ValueKey(key))).data!;
+
+  testWidgets('card: 좌표 없는 서울 광역 공고 → "서울특별시" · 출처 · 임대 조건',
+      (tester) async {
+    await pumpCard(tester, feedItemFromJson(_seoulWideOut()));
+    expect(textOf(tester, 'feed-region-308'), '서울특별시');
+    expect(find.text('출처: LH 마이홈'), findsOneWidget);
+    expect(textOf(tester, 'feed-rent-308'), '임대 조건은 공고문 참고');
+    expect(textOf(tester, 'feed-apply-period-308'), '모집 2026.03.24 ~ 2026.12.31');
+    expect(find.byKey(const ValueKey('public-badge-308')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('feed-meta-308')),
+        matching: find.textContaining('서울특별시'),
+      ),
+      findsOneWidget,
+      reason: 'region once, not repeated as the neighborhood',
+    );
+  });
+
+  testWidgets('card: GG 단지 → "경기 양평군" · 출처: 경기도 · 청년 · 40세대',
+      (tester) async {
+    await pumpCard(tester, feedItemFromJson(_ggComplexOut()));
+    expect(textOf(tester, 'feed-region-344'), '경기 양평군');
+    expect(find.text('출처: 경기도'), findsOneWidget);
+    expect(textOf(tester, 'feed-rent-344'), '청년 · 40세대');
+    expect(find.byKey(const ValueKey('feed-apply-period-344')), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('housing-type-344')),
+        matching: find.text('행복주택'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('detail: 서울 광역 (좌표 없음) → 공고 사이트 이동만', (tester) async {
+    final launched = <Uri>[];
+    await pumpDetail(tester, feedItemFromJson(_seoulWideOut()), launched: launched);
+    expect(find.byKey(const ValueKey('detail-map-cta')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('detail-apply-cta')));
+    await tester.pump();
+    expect(launched.single.toString(), _seoulApplyUrl);
+    expect(find.byKey(const ValueKey('housing-row-주소')), findsOneWidget);
+  });
+
+  testWidgets('detail: GG 단지 (apply_url 없음) → 지도에서 보기만 · 단지 정보 행',
+      (tester) async {
+    await pumpDetail(tester, feedItemFromJson(_ggComplexOut()));
+    expect(find.byKey(const ValueKey('detail-apply-cta')), findsNothing);
+    expect(find.text('공고 사이트 이동'), findsNothing);
+    expect(find.byKey(const ValueKey('detail-map-cta')), findsOneWidget);
+    for (final label in ['입주 대상', '공급세대', '준공일', '안내', '주소']) {
+      expect(find.byKey(ValueKey('housing-row-$label')), findsOneWidget,
+          reason: label);
+    }
+    expect(find.byKey(const ValueKey('housing-row-출처')), findsNothing);
+    expect(find.text('경기도 · 공공데이터'), findsOneWidget);
+    expect(find.text('청년 · 40세대'), findsWidgets);
   });
 }

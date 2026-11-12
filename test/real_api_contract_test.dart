@@ -1074,27 +1074,81 @@ void main() {
     expect(notices.last.isPinned, isFalse);
   });
 
-  test('fetchLocalNews: LOCAL_NEWS by location_id + public_scope, no lat/lng',
+  test('fetchScopedFeeds: 동네소식 by location_id + public_scope, no lat/lng',
       () async {
     final (api, adapter, _) = await _client(
       (_) => (200, {'total': 0, 'page': 1, 'limit': 20, 'items': const []}),
     );
     final repo = DioFeedRepository(api);
-    await repo.fetchLocalNews(locationId: 15);
+    await repo.fetchScopedFeeds(
+      category: FeedCategory.community.name,
+      locationId: 15,
+    );
     expect(adapter.requests.last.path, '/feeds');
     expect(adapter.requests.last.queryParameters, {
       'feed_type': 'LOCAL_NEWS',
       'location_id': 15,
       'public_scope': 'sigungu',
+      'sort': 'latest',
       'page': 1,
       'limit': 20,
     });
 
-    await repo.fetchLocalNews(locationId: 15, scope: PublicScope.zone, page: 2);
+    await repo.fetchScopedFeeds(
+      category: FeedCategory.community.name,
+      locationId: 15,
+      scope: PublicScope.zone,
+      page: 2,
+    );
     final query = adapter.requests.last.queryParameters;
     expect(query['public_scope'], 'zone');
     expect(query['page'], 2);
     expect(query.keys, isNot(contains('lat')));
+  });
+
+  test(
+      'fetchScopedFeeds: 부동산 zone + origin lat/lng · sort, never radius_m',
+      () async {
+    final (api, adapter, _) = await _client(
+      (_) => (200, {'total': 0, 'page': 1, 'limit': 10, 'items': const []}),
+    );
+    final repo = DioFeedRepository(api);
+    const origin = LocationItem(
+      id: '1',
+      cityName: '서울특별시',
+      districtName: '서대문구',
+      dongName: '신촌동',
+      latitude: 37.5598,
+      longitude: 126.9425,
+    );
+    await repo.fetchScopedFeeds(
+      category: FeedCategory.housing.name,
+      locationId: 1,
+      scope: PublicScope.zone,
+      origin: origin,
+      sort: FeedSort.distance,
+      pageSize: 10,
+    );
+    expect(adapter.requests.last.queryParameters, {
+      'feed_type': 'REAL_ESTATE',
+      'location_id': 1,
+      'public_scope': 'zone',
+      'lat': 37.5598,
+      'lng': 126.9425,
+      'sort': 'distance',
+      'page': 1,
+      'limit': 10,
+    });
+
+    await repo.fetchScopedFeeds(
+      category: FeedCategory.housing.name,
+      locationId: 1,
+      scope: PublicScope.zone,
+      sort: FeedSort.distance,
+    );
+    final query = adapter.requests.last.queryParameters;
+    expect(query['sort'], 'latest', reason: 'distance needs an origin');
+    expect(query.keys, isNot(contains('radius_m')));
   });
 
   test('searchFeeds sends q · dong radius · latest · page/limit', () async {

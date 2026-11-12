@@ -164,9 +164,12 @@ class MockFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<List<FeedItem>> fetchLocalNews({
+  Future<List<FeedItem>> fetchScopedFeeds({
+    required String category,
     required int locationId,
     PublicScope scope = PublicScope.sigungu,
+    LocationItem? origin,
+    FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
   }) async {
@@ -175,7 +178,7 @@ class MockFeedRepository implements FeedRepository {
     final items = _catalog()
         .where((item) => !item.id.contains('-p'))
         .where((item) => !_deleted.contains(item.id))
-        .where((item) => item.category == FeedCategory.community)
+        .where((item) => item.matchesCategoryKey(category))
         .map(_withFavorite)
         .toList();
     return items.skip((page - 1) * pageSize).take(pageSize).toList();

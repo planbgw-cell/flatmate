@@ -50,6 +50,8 @@ class FeedCardItem extends ConsumerWidget {
         : null;
     final region = zone == null ? '' : regionLabel(item.address);
     final notice = item.publicNotice;
+    final noticeRegion =
+        notice == null ? '' : noticeRegionLabel(item.address ?? notice.address);
 
     return InkWell(
       onTap: onTap,
@@ -139,17 +141,40 @@ class FeedCardItem extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    [
-                      if (!item.isPublicData) item.authorName,
-                      if (item.neighborhood.isNotEmpty) item.neighborhood,
-                      _timeLabel(item),
-                    ].join(' · '),
-                    key: ValueKey('feed-meta-${item.id}'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.bodyMedium,
-                  ),
+                  if (noticeRegion.isNotEmpty)
+                    Row(
+                      key: ValueKey('feed-meta-${item.id}'),
+                      children: [
+                        Flexible(
+                          child: Text(
+                            noticeRegion,
+                            key: ValueKey('feed-region-${item.id}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          ' · ${_timeLabel(item)}',
+                          style: AppTypography.bodyMedium,
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      [
+                        if (!item.isPublicData) item.authorName,
+                        if (item.neighborhood.isNotEmpty) item.neighborhood,
+                        _timeLabel(item),
+                      ].join(' · '),
+                      key: ValueKey('feed-meta-${item.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyMedium,
+                    ),
                   if (item.isPublicData && item.sourceName != null)
                     SourceLabel(
                       key: ValueKey('feed-source-${item.id}'),

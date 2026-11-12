@@ -3,7 +3,7 @@
 //   flutter test integration_test/real_server_flow_test.dart \
 //     -d <device-id> --dart-define=USE_MOCK_API=false
 //
-// Requires the QA seller account and its seeded posts (정자동 / 청룡동).
+// The seller account and its posts (정자동 / 청룡동) are created per run.
 import 'package:dio/dio.dart';
 import 'package:flatmate_app/app/app.dart';
 import 'package:flatmate_app/app/config/app_config.dart';
@@ -19,10 +19,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-const _sellerEmail = 'qa.seller@example.com';
-const _password = 'Flatmate123!';
-const _sellerJeongjaPost = '정자동 테스트 원룸';
-const _sellerSnuPost = '서울대입구역 도보 5분 원룸';
+import 'support/qa_accounts.dart';
+
+const _password = qaPassword;
 
 final _log = <String>[];
 
@@ -154,14 +153,6 @@ Future<void> _createPost(
 
 Dio _rawDio() => Dio(BaseOptions(baseUrl: AppConfig.devServerBaseUrl));
 
-Future<String> _loginRaw(Dio dio, String email) async {
-  final res = await dio.post<Map<String, dynamic>>(
-    '/auth/login',
-    data: {'email': email, 'password': _password},
-  );
-  return res.data!['access_token'] as String;
-}
-
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -175,6 +166,29 @@ void main() {
     final email = 'qa.device$stamp@example.com';
     final nickname = 'QA폰${stamp % 100000}';
     _step('server=${sl<AppConfig>().apiBaseUrl}, account=$email');
+
+    // Seller + one listing each at 정자동 and 청룡동 (서울대입구역).
+    final dio = _rawDio();
+    final seller = await signUpQaAccount(
+      dio,
+      email: 'qa.seller$stamp@example.com',
+      nickname: 'QA판매${stamp % 10000}',
+    );
+    final jeongjaPost = '[QA $stamp] 정자동 테스트 원룸';
+    final snuPost = '[QA $stamp] 서울대입구역 도보 5분 원룸';
+    final jeongjaId = await createQaRoomPost(
+      dio,
+      seller,
+      title: jeongjaPost,
+      dong: await findServerDong(dio, query: '정자', name: '성남시 분당구 정자동'),
+    );
+    await createQaRoomPost(
+      dio,
+      seller,
+      title: snuPost,
+      dong: await findServerDong(dio, query: '청룡', name: '관악구 청룡동'),
+    );
+    _step('판매자 ${seller.nickname}(API) · 시드 글 "$jeongjaPost"(id $jeongjaId) · "$snuPost"');
 
     await tester.pumpWidget(ProviderScope(child: FlatmateApp()));
 
@@ -220,32 +234,31 @@ void main() {
     await _selectDong(tester, query: '정자', fullName: '성남시 분당구 정자동');
     await _scrollFeedTo(
       tester,
-      find.textContaining(_sellerJeongjaPost),
+      find.textContaining(jeongjaPost),
       backToTop: true,
     );
-    _step('정자동 선택 → 반경 3km 피드에 "$_sellerJeongjaPost" 노출');
+    _step('정자동 선택 → 반경 3km 피드에 "$jeongjaPost" 노출');
 
     // 3) 동네: 청룡동(서울대입구역) → only nearby posts.
     await _selectDong(tester, query: '청룡', fullName: '관악구 청룡동');
     // Newer 한국관광공사 축제 posts nearby push it onto a later page.
     await _scrollFeedTo(
       tester,
-      find.textContaining(_sellerSnuPost),
+      find.textContaining(snuPost),
       backToTop: true,
     );
-    expect(find.textContaining(_sellerJeongjaPost), findsNothing);
-    _step('청룡동(서울대입구역) 선택 → "$_sellerSnuPost"만 노출, 정자동 글 제외');
+    expect(find.textContaining(jeongjaPost), findsNothing);
+    _step('청룡동(서울대입구역) 선택 → "$snuPost"만 노출, 정자동 글 제외');
 
     // Back to 정자동 for posting + chat.
     await _selectDong(tester, query: '정자', fullName: '성남시 분당구 정자동');
     await _scrollFeedTo(
       tester,
-      find.textContaining(_sellerJeongjaPost),
+      find.textContaining(jeongjaPost),
       backToTop: true,
     );
 
     // 4) 게시글 3종 등록 → top of feed + DB row.
-    final dio = _rawDio();
     final created = <String>[];
     Future<void> verifyTop(String title, String feedType) async {
       final items = _container(tester).read(feedListProvider).value!.items;
@@ -296,8 +309,8 @@ void main() {
 
     // 5) 상세 → 채팅으로 문의하기 → 1:1 room → send / receive.
     await _tap(tester, find.text('부동산/주거'));
-    await _scrollFeedTo(tester, find.textContaining(_sellerJeongjaPost));
-    await _tap(tester, find.textContaining(_sellerJeongjaPost));
+    await _scrollFeedTo(tester, find.textContaining(jeongjaPost));
+    await _tap(tester, find.textContaining(jeongjaPost));
     await _pumpUntil(tester, find.text('채팅으로 문의하기'));
     await _tap(tester, find.text('채팅으로 문의하기'));
     await _pumpUntil(tester, find.byType(ChatRoomScreen));
@@ -305,7 +318,7 @@ void main() {
       tester,
       find.descendant(
         of: find.byType(ChatRoomScreen),
-        matching: find.textContaining(_sellerJeongjaPost),
+        matching: find.textContaining(jeongjaPost),
       ),
     );
 
@@ -321,14 +334,13 @@ void main() {
     await _tap(tester, find.byIcon(Icons.send_rounded));
     await _pumpUntil(tester, find.text(outgoing));
 
-    final sellerToken = await _loginRaw(dio, _sellerEmail);
-    final auth = Options(headers: {'Authorization': 'Bearer $sellerToken'});
+    final auth = seller.auth;
     final rooms = (await dio.get<List<dynamic>>('/chats/rooms', options: auth))
         .data!
         .cast<Map<String, dynamic>>();
     final room = rooms.firstWhere(
       (r) =>
-          r['feed_id'] == 1 &&
+          r['feed_id'].toString() == jeongjaId &&
           (r['user_a_id'].toString() == me.id ||
               r['user_b_id'].toString() == me.id),
     );

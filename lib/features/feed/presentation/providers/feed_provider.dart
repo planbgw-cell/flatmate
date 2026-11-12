@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../block_report/presentation/providers/blocked_users_provider.dart';
+import '../../../location/domain/models/location_item.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
@@ -60,21 +61,48 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
   static List<FeedItem> _visible(List<FeedItem> items, Set<String> blocked) =>
       withoutBlockedAuthors(items, blocked);
 
-  @override
-  Future<FeedListState> build() async {
-    final category = ref.watch(selectedCategoryProvider);
-    final location = ref.watch(currentLocationProvider);
-    final radiusKm = ref.watch(locationRadiusProvider);
-    final sort = ref.watch(feedSortProvider);
-    final blocked = _blockedAuthors();
-    final items = await _repo.fetchFeeds(
-      page: 1,
+  /// [부동산/주거] covers the dong's 권역 (`public_scope=zone`) so 광역 notices
+  /// without coordinates show up; other chips stay radius-based. Falls back
+  /// to the radius query when the dong has no server id.
+  Future<List<FeedItem>> _fetch(int page) async {
+    final category = ref.read(selectedCategoryProvider);
+    final location = ref.read(currentLocationProvider);
+    final sort = ref.read(feedSortProvider);
+    if (category == FeedCategory.housing.name) {
+      final dongId = int.tryParse((await _serverDong())?.id ?? '');
+      if (dongId != null) {
+        return _repo.fetchScopedFeeds(
+          category: category,
+          locationId: dongId,
+          scope: PublicScope.zone,
+          origin: location,
+          sort: sort,
+          page: page,
+          pageSize: _pageSize,
+        );
+      }
+    }
+    return _repo.fetchFeeds(
+      page: page,
       pageSize: _pageSize,
       category: category,
       location: location,
-      radiusKm: radiusKm,
+      radiusKm: ref.read(locationRadiusProvider),
       sort: sort,
     );
+  }
+
+  Future<LocationItem?> _serverDong() async {
+    try {
+      return await ref.read(serverDongProvider.future);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<FeedListState> _firstPage() async {
+    final blocked = _blockedAuthors();
+    final items = await _fetch(1);
     return FeedListState(
       items: _visible(items, await blocked),
       page: 1,
@@ -82,28 +110,22 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
     );
   }
 
+  @override
+  Future<FeedListState> build() async {
+    final category = ref.watch(selectedCategoryProvider);
+    ref
+      ..watch(currentLocationProvider)
+      ..watch(locationRadiusProvider)
+      ..watch(feedSortProvider);
+    if (category == FeedCategory.housing.name) {
+      await ref.watch(serverDongProvider.future).catchError((_) => null);
+    }
+    return _firstPage();
+  }
+
   Future<void> refresh() async {
-    final category = ref.read(selectedCategoryProvider);
-    final location = ref.read(currentLocationProvider);
-    final radiusKm = ref.read(locationRadiusProvider);
-    final sort = ref.read(feedSortProvider);
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final blocked = _blockedAuthors();
-      final items = await _repo.fetchFeeds(
-        page: 1,
-        pageSize: _pageSize,
-        category: category,
-        location: location,
-        radiusKm: radiusKm,
-        sort: sort,
-      );
-      return FeedListState(
-        items: _visible(items, await blocked),
-        page: 1,
-        hasMore: items.length >= _pageSize,
-      );
-    });
+    state = await AsyncValue.guard(_firstPage);
   }
 
   Future<void> loadMore() async {
@@ -112,18 +134,8 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
 
     state = AsyncData(current.copyWith(isLoadingMore: true));
     try {
-      final category = ref.read(selectedCategoryProvider);
-      final location = ref.read(currentLocationProvider);
-      final radiusKm = ref.read(locationRadiusProvider);
       final nextPage = current.page + 1;
-      final more = await _repo.fetchFeeds(
-        page: nextPage,
-        pageSize: _pageSize,
-        category: category,
-        location: location,
-        radiusKm: radiusKm,
-        sort: ref.read(feedSortProvider),
-      );
+      final more = await _fetch(nextPage);
       final blocked = await _blockedAuthors();
       state = AsyncData(
         FeedListState(

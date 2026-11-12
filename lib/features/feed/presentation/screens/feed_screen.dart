@@ -12,6 +12,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 import '../../../location/presentation/widgets/location_select_modal.dart';
 import '../../domain/models/feed_item.dart';
+import '../../domain/models/region.dart';
 import '../../domain/repositories/feed_repository.dart';
 import '../feed_actions.dart';
 import '../providers/feed_provider.dart';
@@ -94,6 +95,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               selected: ref.watch(feedSortProvider),
               onSelected: (sort) =>
                   ref.read(feedSortProvider.notifier).state = sort,
+              caption:
+                  category == FeedCategory.housing ? _zoneCaption() : null,
             ),
             const Divider(height: 1),
             Expanded(
@@ -163,13 +166,25 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       ),
     );
   }
+
+  /// "수도권(서울·인천·경기) 공공 주거 공고를 함께 보여드려요" once the dong's
+  /// 권역 is known (the [부동산/주거] chip queries `public_scope=zone`).
+  String? _zoneCaption() {
+    final zone = zoneOf(ref.watch(serverDongProvider).value?.cityName);
+    return zone == null ? null : '${zoneDescription(zone)} 공공 주거 공고를 함께 보여드려요';
+  }
 }
 
 class _FeedSortBar extends StatelessWidget {
-  const _FeedSortBar({required this.selected, required this.onSelected});
+  const _FeedSortBar({
+    required this.selected,
+    required this.onSelected,
+    this.caption,
+  });
 
   final FeedSort selected;
   final ValueChanged<FeedSort> onSelected;
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
@@ -183,6 +198,16 @@ class _FeedSortBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          if (caption case final text?)
+            Expanded(
+              child: Text(
+                text,
+                key: const ValueKey('feed-zone-caption'),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption,
+              ),
+            ),
           for (final sort in FeedSort.values)
             TextButton(
               key: ValueKey('feed-sort-${sort.name}'),
