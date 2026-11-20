@@ -14,7 +14,6 @@ import 'package:flatmate_app/core/utils/external_url.dart';
 import 'package:flatmate_app/features/feed/data/mappers/feed_item_mapper.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_detail_screen.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_screen.dart';
-import 'package:flatmate_app/features/feed/presentation/widgets/feed_visual.dart';
 import 'package:flatmate_app/features/location/presentation/providers/location_provider.dart';
 import 'package:flatmate_app/features/map_around/presentation/providers/map_around_provider.dart';
 import 'package:flatmate_app/features/map_around/presentation/screens/map_around_screen.dart';
@@ -123,10 +122,10 @@ void main() {
     final id = notice.id;
     final applyUrl = notice.publicNotice!.applyUrl!;
     expect(notice.isPublicHousing, isTrue);
-    expect(notice.thumbnailUrl, isEmpty);
     _step('동네 ${dong.dongName}(서버 id ${dong.id}) 권역 공고 $id '
         '[${notice.housingType!.label}] "${notice.displayTitle}" · '
-        '${notice.address} · 이미지 없음');
+        '${notice.address} · '
+        '${notice.thumbnailUrl.isEmpty ? "이미지 없음" : "map.jpg"}');
 
     // 1) 홈 [부동산/주거] card.
     await _tap(tester, find.text('부동산/주거').first);
@@ -165,15 +164,18 @@ void main() {
       ),
       findsOneWidget,
     );
-    final placeholder = find.byKey(ValueKey('feed-placeholder-$id'));
-    expect(placeholder, findsOneWidget);
-    expect(
-      find.descendant(of: placeholder, matching: find.byIcon(feedVisual(notice).icon)),
-      findsOneWidget,
-    );
+    final hasPhoto = notice.thumbnailUrl.trim().isNotEmpty;
+    if (hasPhoto) {
+      expect(find.byKey(ValueKey('feed-thumb-$id')), findsOneWidget);
+      expect(find.byKey(ValueKey('feed-housing-banner-$id')), findsNothing);
+    } else {
+      final banner = find.byKey(ValueKey('feed-housing-banner-$id'));
+      expect(banner, findsOneWidget);
+      expect(find.byKey(ValueKey('feed-placeholder-$id')), findsNothing);
+    }
     _step('홈 [부동산/주거] 카드: [공공 혜택][${notice.housingType!.label}] · '
         '"${notice.publicNotice!.rentSummary}" · "출처: ${notice.sourceName}" · '
-        '유형 플레이스홀더');
+        '${hasPhoto ? "map.jpg" : "유형 배너"}');
 
     // 2) Detail.
     await _tap(tester, find.byKey(ValueKey('feed-thumb-$id')));

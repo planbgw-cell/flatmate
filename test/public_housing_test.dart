@@ -4,12 +4,16 @@ import 'package:flatmate_app/core/utils/external_url.dart';
 import 'package:flatmate_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flatmate_app/features/feed/data/mappers/feed_item_mapper.dart';
 import 'package:flatmate_app/features/feed/data/repositories/mock_feed_repository.dart';
+import 'package:flatmate_app/app/config/app_config.dart';
+import 'package:flatmate_app/core/network/media_url.dart';
 import 'package:flatmate_app/features/feed/domain/models/feed_item.dart';
 import 'package:flatmate_app/features/feed/domain/models/region.dart';
 import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.dart';
 import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_detail_screen.dart';
 import 'package:flatmate_app/features/feed/presentation/widgets/feed_card_item.dart';
+import 'package:flatmate_app/features/feed/presentation/widgets/fullscreen_image_viewer.dart';
+import 'package:flatmate_app/features/feed/presentation/widgets/public_housing_banner.dart';
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
 import 'package:flatmate_app/features/map_around/domain/map_feed_group.dart';
 import 'package:flatmate_app/features/map_around/presentation/providers/map_around_provider.dart';
@@ -170,8 +174,8 @@ Map<String, dynamic> _ggComplexOut() => {
         'event_start_date': null,
       },
       'price_text': null,
-      'image_urls': const <String>[],
-      'thumbnail_url': null,
+      'image_urls': const ['/api/v1/public-housing/161/map.jpg'],
+      'thumbnail_url': '/api/v1/public-housing/161/map.jpg',
       'published_at': '2026-11-12T04:49:24Z',
     };
 
@@ -195,6 +199,54 @@ void main() {
       expect(HousingType.fromCode('YOUTH_HOUSE').label, '청년주택');
       expect(HousingType.fromCode('PUBLIC_RENTAL').label, '공공임대');
       expect(HousingType.fromCode('???'), HousingType.publicRental);
+    });
+
+    test('HousingBannerKind: 행복·청년·전세임대·공공임대', () {
+      expect(
+        HousingBannerKind.fromItem(feedItemFromJson(_happyHouseOut())),
+        HousingBannerKind.happyHouse,
+      );
+      expect(
+        HousingBannerKind.fromItem(feedItemFromJson(_ggComplexOut())),
+        HousingBannerKind.happyHouse,
+      );
+      expect(
+        HousingBannerKind.fromItem(feedItemFromJson(_seoulWideOut())),
+        HousingBannerKind.jeonseRental,
+        reason: 'PUBLIC_RENTAL + 전세임대 in title/공급유형',
+      );
+      expect(
+        HousingBannerKind.fromItem(feedItemFromJson(_rentalOut())),
+        HousingBannerKind.publicRental,
+      );
+      final youth = _seoulWideOut()
+        ..['title'] = '[공공 혜택] 2026년 청년 전세임대 1순위'
+        ..['extra_meta'] = {
+          ...(_seoulWideOut()['extra_meta'] as Map<String, dynamic>),
+          'housing_type': 'YOUTH_HOUSE',
+        };
+      expect(
+        HousingBannerKind.fromItem(feedItemFromJson(youth)),
+        HousingBannerKind.youthHouse,
+        reason: 'YOUTH_HOUSE wins over 전세임대 in the title',
+      );
+    });
+
+    test('map.jpg relative path → absolute media URL', () {
+      final item = feedItemFromJson(_ggComplexOut());
+      final base = Uri.parse(AppConfig.devServerBaseUrl);
+      final expected = base
+          .replace(path: '/api/v1/public-housing/161/map.jpg')
+          .toString();
+      expect(
+        resolveMediaUrl(
+          '/api/v1/public-housing/161/map.jpg',
+          apiBaseUrl: AppConfig.devServerBaseUrl,
+        ),
+        expected,
+      );
+      expect(item.thumbnailUrl, expected);
+      expect(item.imageUrls.single, expected);
     });
 
     test('LH FeedOut → public housing FeedItem + parsed notice', () {
@@ -324,7 +376,7 @@ void main() {
         }),
       ];
 
-  testWidgets('card: [공공 혜택] + 유형 · 임대 조건 · 모집 기간 · 출처 · placeholder',
+  testWidgets('card: [공공 혜택] + 유형 · 임대 조건 · 모집 기간 · 출처 · 배너',
       (tester) async {
     final item = feedItemFromJson(_happyHouseOut());
     await tester.pumpWidget(
@@ -350,8 +402,8 @@ void main() {
     expect(find.text('보증금 2,516만원 · 월 106,930원'), findsOneWidget);
     expect(find.text('모집 2026.11.10 ~ 2026.11.12'), findsOneWidget);
     expect(find.text('출처: LH 마이홈'), findsOneWidget);
-    expect(find.byKey(const ValueKey('feed-placeholder-220')), findsOneWidget);
-    expect(find.byIcon(Icons.home_work), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-housing-banner-220')), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-placeholder-220')), findsNothing);
     expect(find.byType(CachedNetworkImage), findsNothing);
   });
 
@@ -392,7 +444,7 @@ void main() {
 
     expect(find.text('LH 마이홈 · 공공데이터'), findsOneWidget);
     expect(find.byKey(const ValueKey('detail-housing-badges')), findsOneWidget);
-    expect(find.byKey(const ValueKey('feed-placeholder-220')), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-housing-banner-220')), findsOneWidget);
     final card = find.byKey(const ValueKey('detail-card-housing'));
     expect(card, findsOneWidget);
     for (final label in ['모집 기간', '당첨자 발표', '문의', '신청', '공급기관', '임대 조건']) {
@@ -438,7 +490,7 @@ void main() {
     expect(find.text('공고 사이트 이동'), findsOneWidget);
     expect(find.text('지도에서 보기'), findsNothing);
     expect(find.text('임대 조건은 공고문 참고'), findsOneWidget);
-    expect(find.byIcon(Icons.location_city), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-housing-banner-251')), findsOneWidget);
   });
 
   Future<void> pumpCard(WidgetTester tester, FeedItem item) async {
@@ -456,7 +508,7 @@ void main() {
   String textOf(WidgetTester tester, String key) =>
       tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
-  testWidgets('card: 좌표 없는 서울 광역 공고 → "서울특별시" · 출처 · 임대 조건',
+  testWidgets('card: 좌표 없는 서울 광역 공고 → "서울특별시" · 전세임대 배너',
       (tester) async {
     await pumpCard(tester, feedItemFromJson(_seoulWideOut()));
     expect(textOf(tester, 'feed-region-308'), '서울특별시');
@@ -464,6 +516,13 @@ void main() {
     expect(textOf(tester, 'feed-rent-308'), '임대 조건은 공고문 참고');
     expect(textOf(tester, 'feed-apply-period-308'), '모집 2026.03.24 ~ 2026.12.31');
     expect(find.byKey(const ValueKey('public-badge-308')), findsOneWidget);
+    final banner = find.byKey(const ValueKey('feed-housing-banner-308'));
+    expect(banner, findsOneWidget);
+    expect(
+      find.descendant(of: banner, matching: find.text('전세임대')),
+      findsOneWidget,
+    );
+    expect(find.byType(CachedNetworkImage), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('feed-meta-308')),
@@ -474,13 +533,15 @@ void main() {
     );
   });
 
-  testWidgets('card: GG 단지 → "경기 양평군" · 출처: 경기도 · 청년 · 40세대',
+  testWidgets('card: GG 단지 → map.jpg · "경기 양평군" · 청년 · 40세대',
       (tester) async {
     await pumpCard(tester, feedItemFromJson(_ggComplexOut()));
     expect(textOf(tester, 'feed-region-344'), '경기 양평군');
     expect(find.text('출처: 경기도'), findsOneWidget);
     expect(textOf(tester, 'feed-rent-344'), '청년 · 40세대');
     expect(find.byKey(const ValueKey('feed-apply-period-344')), findsNothing);
+    expect(find.byType(CachedNetworkImage), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-housing-banner-344')), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('housing-type-344')),
@@ -513,5 +574,44 @@ void main() {
     expect(find.byKey(const ValueKey('housing-row-출처')), findsNothing);
     expect(find.text('경기도 · 공공데이터'), findsOneWidget);
     expect(find.text('청년 · 40세대'), findsWidgets);
+  });
+
+  testWidgets('detail: 서울 광역 Hero는 전세임대 배너 · 탭해도 뷰어 없음',
+      (tester) async {
+    await pumpDetail(tester, feedItemFromJson(_seoulWideOut()));
+    expect(find.byKey(const ValueKey('feed-housing-banner-308')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('feed-housing-banner-308')),
+        matching: find.text('전세임대'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('feed-housing-banner-308')));
+    await tester.pumpAndSettle();
+    expect(find.byType(FullscreenImageViewer), findsNothing);
+  });
+
+  testWidgets('detail: map.jpg Hero 탭 → 전체화면 뷰어 + [지도에서 보기]',
+      (tester) async {
+    final item = feedItemFromJson(_ggComplexOut());
+    await pumpDetail(tester, item);
+    expect(find.byKey(const ValueKey('detail-image-0')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('detail-image-0')));
+    // Network image / fade may keep animating; don't pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(FullscreenImageViewer), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-viewer-map-cta')), findsOneWidget);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(FeedDetailScreen)),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-viewer-map-cta')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(FullscreenImageViewer), findsNothing);
+    expect(find.text('around-tab'), findsOneWidget);
+    expect(container.read(mapFocusProvider)?.id, '344');
   });
 }

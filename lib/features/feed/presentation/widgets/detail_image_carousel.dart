@@ -13,6 +13,7 @@ class DetailImageCarousel extends StatelessWidget {
     required this.index,
     required this.onPageChanged,
     this.placeholder,
+    this.onImageTap,
   });
 
   final List<String> images;
@@ -22,9 +23,14 @@ class DetailImageCarousel extends StatelessWidget {
   /// Shown for a missing / broken image (e.g. image-less LH notices).
   final Widget? placeholder;
 
+  /// Fired when a real (non-empty) gallery image is tapped.
+  final ValueChanged<int>? onImageTap;
+
   @override
   Widget build(BuildContext context) {
-    final total = images.isEmpty ? 1 : images.length;
+    final urls = images.where((u) => u.trim().isNotEmpty).toList();
+    final hasPhotos = urls.isNotEmpty;
+    final total = hasPhotos ? urls.length : 1;
     final safeIndex = index.clamp(0, total - 1);
 
     return Stack(
@@ -34,11 +40,11 @@ class DetailImageCarousel extends StatelessWidget {
           itemCount: total,
           onPageChanged: onPageChanged,
           itemBuilder: (context, i) {
-            final url = images.isEmpty ? '' : images[i];
-            if (url.isEmpty) {
+            if (!hasPhotos) {
               return placeholder ?? Container(color: AppColors.border);
             }
-            return CachedNetworkImage(
+            final url = urls[i];
+            final image = CachedNetworkImage(
               key: ValueKey('detail-image-$i'),
               imageUrl: url,
               fit: BoxFit.cover,
@@ -46,6 +52,11 @@ class DetailImageCarousel extends StatelessWidget {
               placeholder: (_, _) => Container(color: AppColors.border),
               errorWidget: (_, _, _) =>
                   placeholder ?? const ImageErrorWidget(iconSize: 48),
+            );
+            if (onImageTap == null) return image;
+            return GestureDetector(
+              onTap: () => onImageTap!(i),
+              child: image,
             );
           },
         ),
@@ -61,45 +72,47 @@ class DetailImageCarousel extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          right: AppSpacing.md,
-          bottom: AppSpacing.md,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xs,
-              vertical: AppSpacing.xxs,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${safeIndex + 1} / $total',
-              style: AppTypography.caption.copyWith(color: Colors.white),
+        if (hasPhotos) ...[
+          Positioned(
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: AppSpacing.xxs,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${safeIndex + 1} / $total',
+                style: AppTypography.caption.copyWith(color: Colors.white),
+              ),
             ),
           ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: AppSpacing.md + 28,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(total, (i) {
-              final active = i == safeIndex;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: active ? 16 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: active ? Colors.white : Colors.white54,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              );
-            }),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: AppSpacing.md + 28,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(total, (i) {
+                final active = i == safeIndex;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: active ? Colors.white : Colors.white54,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

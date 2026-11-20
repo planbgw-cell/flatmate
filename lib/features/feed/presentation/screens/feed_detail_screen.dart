@@ -23,7 +23,9 @@ import '../widgets/detail_bottom_bar.dart';
 import '../widgets/detail_image_carousel.dart';
 import '../widgets/feed_thumbnail.dart';
 import '../widgets/festival_badge.dart';
+import '../widgets/fullscreen_image_viewer.dart';
 import '../widgets/public_housing_badge.dart';
+import '../widgets/public_housing_banner.dart';
 import '../widgets/public_housing_notice_card.dart';
 import '../widgets/trade_status_badge.dart';
 
@@ -42,7 +44,12 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
   int _galleryIndex = 0;
   double _scrollOffset = 0;
 
-  static const _expandedHeight = 340.0;
+  static const _expandedHeightDefault = 340.0;
+  static const _expandedHeightHousing = 220.0;
+
+  double get _expandedHeight => widget.item.isPublicHousing
+      ? _expandedHeightHousing
+      : _expandedHeightDefault;
 
   @override
   void initState() {
@@ -67,6 +74,19 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     final range = _expandedHeight - kToolbarHeight;
     if (range <= 0) return 0;
     return (_scrollOffset / range).clamp(0.0, 1.0);
+  }
+
+  void _openGallery(FeedItem item, int index) {
+    final photos =
+        item.gallery.where((u) => u.trim().isNotEmpty).toList(growable: false);
+    if (photos.isEmpty) return;
+    final located = item.latitude != null && item.longitude != null;
+    FullscreenImageViewer.open(
+      context,
+      images: photos,
+      initialIndex: index,
+      onOpenMap: located ? () => _openOnMap(item) : null,
+    );
   }
 
   /// Structured form for the post's `feed_type` (community posts have none).
@@ -300,7 +320,10 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                   images: item.gallery,
                   index: _galleryIndex,
                   onPageChanged: (i) => setState(() => _galleryIndex = i),
-                  placeholder: FeedPlaceholder(item: item, large: true),
+                  onImageTap: (i) => _openGallery(item, i),
+                  placeholder: item.isPublicHousing
+                      ? PublicHousingBanner(item: item, large: true)
+                      : FeedPlaceholder(item: item, large: true),
                 ),
               ),
             ),
