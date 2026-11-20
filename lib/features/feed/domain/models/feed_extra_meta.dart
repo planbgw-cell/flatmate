@@ -31,6 +31,9 @@ abstract final class ExtraMetaKeys {
   // reuses deposit / monthly_rent (만원) and the event dates (모집 기간).
   static const housingType = 'housing_type';
   static const applyUrl = 'apply_url';
+
+  /// Located public-housing notices: subway label + 1km POI counts.
+  static const nearbySummary = 'nearby_summary';
 }
 
 enum RoomType {

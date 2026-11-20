@@ -1,6 +1,7 @@
 import 'public_housing.dart';
 
-export 'public_housing.dart' show HousingType, PublicHousingNotice;
+export 'public_housing.dart'
+    show HousingType, NearbySummary, PublicHousingNotice;
 
 /// Feed domain model + mock catalog for Step 1-3 UI.
 enum FeedCategory {
@@ -148,6 +149,10 @@ class FeedItem {
   PublicHousingNotice? get publicNotice => isPublicHousing
       ? PublicHousingNotice.parse(description, extraMeta)
       : null;
+
+  /// 주변 입지 요약 (`extra_meta.nearby_summary`); null when missing / empty.
+  NearbySummary? get nearbySummary =>
+      isPublicHousing ? NearbySummary.tryParse(extraMeta) : null;
 
   static final _festivalPrefix = RegExp(r'^\s*\[축제\]\s*');
   static final _publicHousingPrefix = RegExp(r'^\s*\[공공 ?혜택\]\s*');

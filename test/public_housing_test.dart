@@ -172,6 +172,12 @@ Map<String, dynamic> _ggComplexOut() => {
         'monthly_rent': 0,
         'event_end_date': null,
         'event_start_date': null,
+        'nearby_summary': {
+          'subway': '경의중앙선 양평역 도보 13분 (971m)',
+          'convenience': 20,
+          'mart': 3,
+          'hospital': 50,
+        },
       },
       'price_text': null,
       'image_urls': const ['/api/v1/public-housing/161/map.jpg'],
@@ -199,6 +205,47 @@ void main() {
       expect(HousingType.fromCode('YOUTH_HOUSE').label, '청년주택');
       expect(HousingType.fromCode('PUBLIC_RENTAL').label, '공공임대');
       expect(HousingType.fromCode('???'), HousingType.publicRental);
+    });
+
+    test('NearbySummary.tryParse: 정상 · subway null · 없음', () {
+      final full = NearbySummary.tryParse({
+        'nearby_summary': {
+          'subway': '경의중앙선 양평역 도보 13분 (971m)',
+          'convenience': 20,
+          'mart': 3,
+          'hospital': 50,
+        },
+      })!;
+      expect(full.subway, '경의중앙선 양평역 도보 13분 (971m)');
+      expect(full.convenience, 20);
+      expect(full.mart, 3);
+      expect(full.hospital, 50);
+
+      final noSubway = NearbySummary.tryParse({
+        'nearby_summary': {
+          'subway': null,
+          'convenience': 45,
+          'mart': 2,
+          'hospital': 30,
+        },
+      })!;
+      expect(noSubway.subway, isNull);
+      expect(noSubway.convenience, 45);
+
+      expect(NearbySummary.tryParse(const {}), isNull);
+      expect(
+        NearbySummary.tryParse({
+          'nearby_summary': {
+            'subway': null,
+            'convenience': 0,
+            'mart': 0,
+            'hospital': 0,
+          },
+        }),
+        isNull,
+      );
+      expect(feedItemFromJson(_ggComplexOut()).nearbySummary?.mart, 3);
+      expect(feedItemFromJson(_seoulWideOut()).nearbySummary, isNull);
     });
 
     test('HousingBannerKind: 행복·청년·전세임대·공공임대', () {
@@ -574,6 +621,44 @@ void main() {
     expect(find.byKey(const ValueKey('housing-row-출처')), findsNothing);
     expect(find.text('경기도 · 공공데이터'), findsOneWidget);
     expect(find.text('청년 · 40세대'), findsWidgets);
+  });
+
+  testWidgets('detail: GG → 주변 입지 요약 + 자격 가이드(행복주택)', (tester) async {
+    await pumpDetail(tester, feedItemFromJson(_ggComplexOut()));
+    final nearby = find.byKey(const ValueKey('detail-card-nearby'));
+    expect(nearby, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(nearby), alignment: 0.4);
+    await tester.pumpAndSettle();
+    expect(find.text('경의중앙선 양평역 도보 13분 (971m)'), findsOneWidget);
+    expect(find.text('1km 내 20곳'), findsOneWidget);
+    expect(find.text('1km 내 3곳'), findsOneWidget);
+    expect(find.text('1km 내 50곳'), findsOneWidget);
+
+    final guide = find.byKey(const ValueKey('detail-card-eligibility'));
+    expect(guide, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(guide), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('detail-eligibility-tile')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('detail-eligibility-steps')), findsOneWidget);
+    expect(
+      find.textContaining('1. 공고문 확인 → 2. 온라인 청약 신청 → 3. 서류 제출 및 당첨 발표'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('무주택 세대구성원'), findsOneWidget);
+  });
+
+  testWidgets('detail: 서울 광역 → 입지 카드 없음 · 전세임대 가이드만', (tester) async {
+    await pumpDetail(tester, feedItemFromJson(_seoulWideOut()));
+    expect(find.byKey(const ValueKey('detail-card-nearby')), findsNothing);
+    final guide = find.byKey(const ValueKey('detail-card-eligibility'));
+    expect(guide, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(guide), alignment: 0.5);
+    await tester.pumpAndSettle();
+    expect(find.text('전세임대'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('detail-eligibility-tile')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('LH 전세임대'), findsOneWidget);
   });
 
   testWidgets('detail: 서울 광역 Hero는 전세임대 배너 · 탭해도 뷰어 없음',

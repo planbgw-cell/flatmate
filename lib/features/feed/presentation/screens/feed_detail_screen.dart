@@ -21,9 +21,11 @@ import '../widgets/author_profile_card.dart';
 import '../widgets/category_detail_card.dart';
 import '../widgets/detail_bottom_bar.dart';
 import '../widgets/detail_image_carousel.dart';
+import '../widgets/eligibility_guide_card.dart';
 import '../widgets/feed_thumbnail.dart';
 import '../widgets/festival_badge.dart';
 import '../widgets/fullscreen_image_viewer.dart';
+import '../widgets/nearby_location_card.dart';
 import '../widgets/public_housing_badge.dart';
 import '../widgets/public_housing_banner.dart';
 import '../widgets/public_housing_notice_card.dart';
@@ -405,6 +407,14 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                             : item.description,
                         style: AppTypography.bodyLarge.copyWith(height: 1.55),
                       ),
+                    if (notice != null) ...[
+                      if (item.nearbySummary case final nearby?) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        NearbyLocationCard(nearby: nearby),
+                      ],
+                      const SizedBox(height: AppSpacing.md),
+                      EligibilityGuideCard(item: item),
+                    ],
                     if (notice == null &&
                         (item.detailMeta.isNotEmpty ||
                             item.extraMeta.isNotEmpty)) ...[

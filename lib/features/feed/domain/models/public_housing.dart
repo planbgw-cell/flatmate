@@ -145,3 +145,48 @@ class PublicHousingNotice {
         for (final note in notes) FeedDetailRow('안내', note),
       ];
 }
+
+/// `extra_meta.nearby_summary` for located public-housing notices
+/// (지하철 문구 + 반경 1km POI 개수).
+class NearbySummary {
+  const NearbySummary({
+    this.subway,
+    this.convenience = 0,
+    this.mart = 0,
+    this.hospital = 0,
+  });
+
+  /// e.g. "경의중앙선 양평역 도보 13분 (971m)"; null when no station nearby.
+  final String? subway;
+  final int convenience;
+  final int mart;
+  final int hospital;
+
+  bool get hasContent =>
+      (subway != null && subway!.isNotEmpty) ||
+      convenience > 0 ||
+      mart > 0 ||
+      hospital > 0;
+
+  /// Null when the key is missing or every field is empty.
+  static NearbySummary? tryParse(Map<String, dynamic> extraMeta) {
+    final raw = extraMeta[ExtraMetaKeys.nearbySummary];
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final subway = map['subway']?.toString().trim();
+    final summary = NearbySummary(
+      subway: (subway == null || subway.isEmpty || subway == 'null')
+          ? null
+          : subway,
+      convenience: _count(map['convenience']),
+      mart: _count(map['mart']),
+      hospital: _count(map['hospital']),
+    );
+    return summary.hasContent ? summary : null;
+  }
+
+  static int _count(Object? value) {
+    if (value is num) return value.toInt().clamp(0, 999999);
+    return int.tryParse(value?.toString() ?? '')?.clamp(0, 999999) ?? 0;
+  }
+}
