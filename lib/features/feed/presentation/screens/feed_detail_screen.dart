@@ -29,6 +29,7 @@ import '../widgets/nearby_location_card.dart';
 import '../widgets/public_housing_badge.dart';
 import '../widgets/public_housing_banner.dart';
 import '../widgets/public_housing_notice_card.dart';
+import '../widgets/job_apply_guide_card.dart';
 import '../widgets/public_job_badge.dart';
 import '../widgets/public_job_banner.dart';
 import '../widgets/public_job_notice_card.dart';
@@ -456,6 +457,14 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ],
                       const SizedBox(height: AppSpacing.md),
                       EligibilityGuideCard(item: item),
+                    ],
+                    if (job != null) ...[
+                      if (item.nearbySummary case final nearby?) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        NearbyLocationCard(nearby: nearby),
+                      ],
+                      const SizedBox(height: AppSpacing.md),
+                      JobApplyGuideCard(item: item),
                     ],
                     if (notice == null &&
                         job == null &&

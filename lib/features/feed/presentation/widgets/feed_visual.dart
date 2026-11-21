@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/models/feed_item.dart';
+import 'public_job_banner.dart';
 
 /// Icon + color per post kind, shared by thumbnails placeholders and map pins.
 ({IconData icon, Color color}) feedVisual(FeedItem item) {
@@ -25,23 +26,9 @@ import '../../domain/models/feed_item.dart';
         ),
     };
   }
-  final job = item.jobType;
-  if (job != null) {
-    final visual = switch (job) {
-      PublicJobType.publicWork => (
-          icon: Icons.work_outline,
-          color: const Color(0xFF0F766E),
-        ),
-      PublicJobType.contract || PublicJobType.partTime => (
-          icon: Icons.schedule,
-          color: const Color(0xFF2563EB),
-        ),
-      PublicJobType.intern => (
-          icon: Icons.school_outlined,
-          color: const Color(0xFF7C3AED),
-        ),
-    };
-    return visual;
+  if (item.isPublicJob) {
+    final kind = JobBannerKind.fromTitle(item.title);
+    return (icon: kind.icon, color: kind.primary);
   }
   return switch (item.category) {
     FeedCategory.housing => (

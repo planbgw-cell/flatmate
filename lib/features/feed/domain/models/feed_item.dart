@@ -154,7 +154,9 @@ class FeedItem {
 
   /// 주변 입지 요약 (`extra_meta.nearby_summary`); null when missing / empty.
   NearbySummary? get nearbySummary =>
-      isPublicHousing ? NearbySummary.tryParse(extraMeta) : null;
+      isPublicHousing || isPublicJob
+          ? NearbySummary.tryParse(extraMeta)
+          : null;
 
   /// SEOUL_JOB / GG_JOB 등 (`extra_meta.category == PUBLIC_JOB`).
   bool get isPublicJob => extraMeta['category'] == 'PUBLIC_JOB';

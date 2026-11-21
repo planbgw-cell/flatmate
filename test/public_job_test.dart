@@ -1,4 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flatmate_app/app/config/app_config.dart';
 import 'package:flatmate_app/app/routes/route_names.dart';
+import 'package:flatmate_app/core/network/media_url.dart';
 import 'package:flatmate_app/core/utils/external_url.dart';
 import 'package:flatmate_app/features/auth/presentation/providers/auth_provider.dart';
 import 'package:flatmate_app/features/feed/data/mappers/feed_item_mapper.dart';
@@ -8,6 +11,9 @@ import 'package:flatmate_app/features/feed/domain/repositories/feed_repository.d
 import 'package:flatmate_app/features/feed/presentation/providers/feed_provider.dart';
 import 'package:flatmate_app/features/feed/presentation/screens/feed_detail_screen.dart';
 import 'package:flatmate_app/features/feed/presentation/widgets/feed_card_item.dart';
+import 'package:flatmate_app/features/feed/presentation/widgets/fullscreen_image_viewer.dart';
+import 'package:flatmate_app/features/feed/presentation/widgets/job_apply_guide_card.dart';
+import 'package:flatmate_app/features/feed/presentation/widgets/public_job_banner.dart';
 import 'package:flatmate_app/features/location/domain/models/location_item.dart';
 import 'package:flatmate_app/features/map_around/presentation/providers/map_around_provider.dart';
 import 'package:flutter/material.dart';
@@ -85,7 +91,7 @@ Map<String, dynamic> _ggJobOut() => {
       'published_at': '2026-11-15T10:00:00Z',
     };
 
-/// 청년인턴 + 좌표 (지도 CTA).
+/// 청년인턴 + 좌표 (지도 CTA, 배너만 — 이미지 없음).
 Map<String, dynamic> _internJobOut() => {
       'id': 503,
       'feed_type': 'JOB',
@@ -110,6 +116,41 @@ Map<String, dynamic> _internJobOut() => {
       'image_urls': const <String>[],
       'thumbnail_url': null,
       'published_at': '2026-11-16T08:00:00Z',
+    };
+
+const _jobMapPath = '/api/v1/public-jobs/504/map.jpg';
+
+/// 좌표 + map.jpg + nearby_summary (입지·Hero 지도).
+Map<String, dynamic> _locatedJobOut() => {
+      'id': 504,
+      'feed_type': 'JOB',
+      'source': 'GG_JOB',
+      'is_public_data': true,
+      'source_name': '경기도 일자리',
+      'title': '[공공 일자리] [양평군] 양평도서관 자료실 운영 기간제',
+      'content': '모집 기관: 양평군청\n급여: 일급 90,000원\n신청: $_ggApplyUrl',
+      'address': '경기도 양평군 양평읍 남북로 70',
+      'lat': 37.4889516711391,
+      'lng': 127.502183615536,
+      'extra_meta': {
+        'category': 'PUBLIC_JOB',
+        'job_type': 'CONTRACT',
+        'company_name': '양평군청',
+        'wage_summary': '일급 90,000원',
+        'apply_url': _ggApplyUrl,
+        'event_start_date': '2026-11-10',
+        'event_end_date': '2026-11-30',
+        'nearby_summary': {
+          'subway': '경의중앙선 양평역 도보 13분 (971m)',
+          'convenience': 20,
+          'mart': 3,
+          'hospital': 50,
+        },
+      },
+      'price_text': '일급 90,000원',
+      'image_urls': const [_jobMapPath],
+      'thumbnail_url': _jobMapPath,
+      'published_at': '2026-11-16T09:00:00Z',
     };
 
 class _Feeds extends MockFeedRepository {
@@ -192,6 +233,50 @@ void main() {
       expect(app.publicJob, isNull);
       expect(app.displayTitle, '[공공 일자리] 아님');
     });
+
+    test('JobBannerKind.fromTitle: 6종 키워드', () {
+      expect(JobBannerKind.fromTitle('병원 간호 보조'), JobBannerKind.medical);
+      expect(JobBannerKind.fromTitle('도서관 강사 모집'), JobBannerKind.education);
+      expect(JobBannerKind.fromTitle('디지털 정보화 사업'), JobBannerKind.it);
+      expect(JobBannerKind.fromTitle('청년 행정인턴'), JobBannerKind.admin);
+      expect(JobBannerKind.fromTitle('환경미화 수거'), JobBannerKind.field);
+      expect(JobBannerKind.fromTitle('기간제근로자 채용'), JobBannerKind.general);
+      expect(
+        JobBannerKind.fromTitle(feedItemFromJson(_ggJobOut()).title),
+        JobBannerKind.education,
+      );
+      expect(
+        JobBannerKind.fromTitle(feedItemFromJson(_seoulJobOut()).title),
+        JobBannerKind.general,
+      );
+    });
+
+    test('map.jpg relative path + nearby_summary for PUBLIC_JOB', () {
+      final item = feedItemFromJson(_locatedJobOut());
+      final expected = Uri.parse(AppConfig.devServerBaseUrl)
+          .replace(path: _jobMapPath)
+          .toString();
+      expect(
+        resolveMediaUrl(_jobMapPath, apiBaseUrl: AppConfig.devServerBaseUrl),
+        expected,
+      );
+      expect(item.thumbnailUrl, expected);
+      expect(item.imageUrls.single, expected);
+      expect(item.nearbySummary?.subway, '경의중앙선 양평역 도보 13분 (971m)');
+      expect(item.nearbySummary?.convenience, 20);
+      expect(feedItemFromJson(_ggJobOut()).nearbySummary, isNull);
+    });
+
+    test('JobApplyGuideCard.guideLabel: CONTRACT → 계약직', () {
+      expect(
+        JobApplyGuideCard.guideLabel(PublicJobType.contract),
+        '계약직',
+      );
+      expect(
+        JobApplyGuideCard.guideLabel(PublicJobType.partTime),
+        '단기알바',
+      );
+    });
   });
 
   List<Override> overrides({List<Uri>? launched}) => [
@@ -245,7 +330,7 @@ void main() {
     return router;
   }
 
-  testWidgets('card: 뱃지 · 시급 · 기관 · 접수 마감 · 배너', (tester) async {
+  testWidgets('card: 뱃지 · 시급 · 기관 · 접수 마감 · 직무 배너(일반)', (tester) async {
     final item = feedItemFromJson(_seoulJobOut());
     await pumpCard(tester, item);
 
@@ -264,10 +349,15 @@ void main() {
     expect(find.text('접수 마감 2026.12.31'), findsOneWidget);
     expect(find.textContaining('서대문구청'), findsOneWidget);
     expect(find.text('출처: 서울시 공공일자리'), findsOneWidget);
-    expect(find.byKey(const ValueKey('feed-job-banner-501')), findsOneWidget);
+    final banner = find.byKey(const ValueKey('feed-job-banner-501'));
+    expect(banner, findsOneWidget);
+    expect(
+      find.descendant(of: banner, matching: find.text('공공일자리')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('card: GG 단기알바 · 양평군 · apply 없는 목록 메타', (tester) async {
+  testWidgets('card: GG 교육/강사 배너 · 양평군 · 단기알바 유형칩', (tester) async {
     await pumpCard(tester, feedItemFromJson(_ggJobOut()));
     expect(
       find.descendant(
@@ -282,19 +372,42 @@ void main() {
       contains('양평군'),
     );
     expect(find.text('접수 마감 2026.11.30'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('feed-job-banner-502')),
+        matching: find.text('교육/강사'),
+      ),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('detail: 채용 핵심 정보 · 지원 사이트 · no chat', (tester) async {
+  testWidgets('card: map.jpg 썸네일 → 배너 없음', (tester) async {
+    await pumpCard(tester, feedItemFromJson(_locatedJobOut()));
+    expect(find.byType(CachedNetworkImage), findsOneWidget);
+    expect(find.byKey(const ValueKey('feed-job-banner-504')), findsNothing);
+  });
+
+  testWidgets('detail: 채용 핵심 정보 · 지원 사이트 · 체크리스트 · no chat',
+      (tester) async {
     final launched = <Uri>[];
     await pumpDetail(tester, feedItemFromJson(_ggJobOut()), launched: launched);
 
     expect(find.text('경기도 일자리 · 공공데이터'), findsOneWidget);
     expect(find.byKey(const ValueKey('detail-job-badges')), findsOneWidget);
     expect(find.byKey(const ValueKey('feed-job-banner-502')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('feed-job-banner-502')),
+        matching: find.text('교육/강사'),
+      ),
+      findsWidgets,
+    );
     expect(find.byKey(const ValueKey('detail-card-job')), findsOneWidget);
     for (final label in ['모집 기관', '급여 조건', '근무 형태', '접수 마감', '근무 지역', '신청']) {
       expect(find.byKey(ValueKey('job-row-$label')), findsOneWidget, reason: label);
     }
+    expect(find.byKey(const ValueKey('detail-card-nearby')), findsNothing);
+    expect(find.byKey(const ValueKey('detail-card-job-guide')), findsOneWidget);
     expect(find.text('채팅하기'), findsNothing);
     expect(find.textContaining('채팅 '), findsNothing);
     expect(find.text('지원하기'), findsNothing);
@@ -304,9 +417,23 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('detail-apply-cta')));
     await tester.pump();
     expect(launched.single.toString(), _ggApplyUrl);
+
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const ValueKey('detail-job-guide-tile'))),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('detail-job-guide-tile')));
+    await tester.pumpAndSettle();
+    expect(find.text('계약직'), findsWidgets);
+    expect(find.byKey(const ValueKey('detail-job-guide-steps')), findsOneWidget);
+    expect(
+      find.textContaining('1. 공고문 확인 → 2. 온라인/방문 접수 → 3. 서류·면접(해당 시)'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('detail: 좌표+apply → 지원 사이트 + 지도', (tester) async {
+  testWidgets('detail: 좌표+apply → 지원 사이트 + 지도 + 행정 배너', (tester) async {
     final launched = <Uri>[];
     await pumpDetail(
       tester,
@@ -321,8 +448,16 @@ void main() {
       ),
       findsWidgets,
     );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('feed-job-banner-503')),
+        matching: find.text('행정/사무'),
+      ),
+      findsWidgets,
+    );
     expect(find.text('지원 사이트 이동'), findsOneWidget);
     expect(find.text('지도에서 보기'), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-card-job-guide')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('detail-apply-cta')));
     await tester.pump();
@@ -337,7 +472,7 @@ void main() {
     expect(container.read(mapFocusProvider)?.id, '503');
   });
 
-  testWidgets('detail: SEOUL without apply/좌표 → like + wage only',
+  testWidgets('detail: SEOUL without apply/좌표 → like + wage + 체크리스트',
       (tester) async {
     await pumpDetail(tester, feedItemFromJson(_seoulJobOut()));
     expect(find.byKey(const ValueKey('detail-apply-cta')), findsNothing);
@@ -346,5 +481,42 @@ void main() {
     expect(find.text('지도에서 보기'), findsNothing);
     expect(find.text('시급 12,121원'), findsWidgets);
     expect(find.byKey(const ValueKey('detail-like')), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-card-job-guide')), findsOneWidget);
+  });
+
+  testWidgets('detail: map.jpg · 입지 요약 · 체크리스트', (tester) async {
+    await pumpDetail(tester, feedItemFromJson(_locatedJobOut()));
+    expect(find.byKey(const ValueKey('feed-job-banner-504')), findsNothing);
+    expect(find.byKey(const ValueKey('detail-image-0')), findsOneWidget);
+
+    final nearby = find.byKey(const ValueKey('detail-card-nearby'));
+    expect(nearby, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(nearby), alignment: 0.4);
+    await tester.pumpAndSettle();
+    expect(find.text('경의중앙선 양평역 도보 13분 (971m)'), findsOneWidget);
+    expect(find.text('1km 내 20곳'), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-card-job-guide')), findsOneWidget);
+  });
+
+  testWidgets('detail: map.jpg Hero 탭 → 전체화면 뷰어 + 지도에서 보기',
+      (tester) async {
+    final item = feedItemFromJson(_locatedJobOut());
+    await pumpDetail(tester, item);
+    expect(find.byKey(const ValueKey('detail-image-0')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('detail-image-0')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(FullscreenImageViewer), findsOneWidget);
+    expect(find.byKey(const ValueKey('detail-viewer-map-cta')), findsOneWidget);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(FeedDetailScreen)),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-viewer-map-cta')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(FullscreenImageViewer), findsNothing);
+    expect(find.text('around-tab'), findsOneWidget);
+    expect(container.read(mapFocusProvider)?.id, '504');
   });
 }
