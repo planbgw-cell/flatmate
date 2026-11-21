@@ -14,6 +14,7 @@ import 'feed_thumbnail.dart';
 import 'festival_badge.dart';
 import 'like_heart.dart';
 import 'public_housing_badge.dart';
+import 'public_job_badge.dart';
 import 'trade_status_badge.dart';
 
 class FeedCardItem extends ConsumerWidget {
@@ -50,8 +51,16 @@ class FeedCardItem extends ConsumerWidget {
         : null;
     final region = zone == null ? '' : regionLabel(item.address);
     final notice = item.publicNotice;
+    final job = item.publicJob;
     final noticeRegion =
         notice == null ? '' : noticeRegionLabel(item.address ?? notice.address);
+    final jobRegion = job == null
+        ? ''
+        : (PublicJobNotice.regionFrom(
+              address: item.address,
+              title: item.title,
+            ) ??
+            '');
 
     return InkWell(
       onTap: onTap,
@@ -85,6 +94,10 @@ class FeedCardItem extends ConsumerWidget {
                 children: [
                   if (notice != null) ...[
                     PublicHousingBadges(item: item),
+                    const SizedBox(height: AppSpacing.xxs),
+                  ],
+                  if (job != null) ...[
+                    PublicJobBadges(item: item),
                     const SizedBox(height: AppSpacing.xxs),
                   ],
                   if (zone != null) ...[
@@ -163,6 +176,18 @@ class FeedCardItem extends ConsumerWidget {
                         ),
                       ],
                     )
+                  else if (job != null)
+                    Text(
+                      [
+                        ?job.companyName,
+                        if (jobRegion.isNotEmpty) jobRegion,
+                        _timeLabel(item),
+                      ].join(' · '),
+                      key: ValueKey('feed-meta-${item.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyMedium,
+                    )
                   else
                     Text(
                       [
@@ -197,6 +222,26 @@ class FeedCardItem extends ConsumerWidget {
                         key: ValueKey('feed-apply-period-${item.id}'),
                         style: AppTypography.caption.copyWith(
                           color: PublicBenefitBadge.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ] else if (job != null) ...[
+                    Text(
+                      job.wageSummary,
+                      key: ValueKey('feed-wage-${item.id}'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (job.deadlineLabel case final deadline?)
+                      Text(
+                        '접수 마감 $deadline',
+                        key: ValueKey('feed-deadline-${item.id}'),
+                        style: AppTypography.caption.copyWith(
+                          color: PublicJobBenefitBadge.color,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

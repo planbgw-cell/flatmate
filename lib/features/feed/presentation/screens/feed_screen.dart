@@ -95,8 +95,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               selected: ref.watch(feedSortProvider),
               onSelected: (sort) =>
                   ref.read(feedSortProvider.notifier).state = sort,
-              caption:
-                  category == FeedCategory.housing ? _zoneCaption() : null,
+              caption: switch (category) {
+                FeedCategory.housing => _zoneCaption('공공 주거 공고'),
+                FeedCategory.job => _zoneCaption('공공 일자리'),
+                _ => null,
+              },
             ),
             const Divider(height: 1),
             Expanded(
@@ -167,11 +170,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     );
   }
 
-  /// "수도권(서울·인천·경기) 공공 주거 공고를 함께 보여드려요" once the dong's
-  /// 권역 is known (the [부동산/주거] chip queries `public_scope=zone`).
-  String? _zoneCaption() {
+  /// "수도권(서울·인천·경기) …를 함께 보여드려요" once the dong's 권역 is known
+  /// (housing / job chips query `public_scope=zone`).
+  String? _zoneCaption(String subject) {
     final zone = zoneOf(ref.watch(serverDongProvider).value?.cityName);
-    return zone == null ? null : '${zoneDescription(zone)} 공공 주거 공고를 함께 보여드려요';
+    return zone == null
+        ? null
+        : '${zoneDescription(zone)} $subject를 함께 보여드려요';
   }
 }
 

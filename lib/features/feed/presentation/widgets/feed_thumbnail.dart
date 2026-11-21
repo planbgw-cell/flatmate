@@ -6,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../domain/models/feed_item.dart';
 import 'feed_visual.dart';
 import 'public_housing_banner.dart';
+import 'public_job_banner.dart';
 
 /// Post image, or a kind-specific placeholder / public-housing banner when
 /// the URL is empty or fails (LH 광역 notices ship without map images).
@@ -30,6 +31,9 @@ class FeedThumbnail extends StatelessWidget {
   Widget _fallback() {
     if (item.isPublicHousing) {
       return PublicHousingBanner(item: item, large: large);
+    }
+    if (item.isPublicJob) {
+      return PublicJobBanner(item: item, large: large);
     }
     return FeedPlaceholder(item: item, large: large);
   }

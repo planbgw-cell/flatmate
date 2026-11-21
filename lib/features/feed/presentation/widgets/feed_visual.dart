@@ -25,6 +25,24 @@ import '../../domain/models/feed_item.dart';
         ),
     };
   }
+  final job = item.jobType;
+  if (job != null) {
+    final visual = switch (job) {
+      PublicJobType.publicWork => (
+          icon: Icons.work_outline,
+          color: const Color(0xFF0F766E),
+        ),
+      PublicJobType.contract || PublicJobType.partTime => (
+          icon: Icons.schedule,
+          color: const Color(0xFF2563EB),
+        ),
+      PublicJobType.intern => (
+          icon: Icons.school_outlined,
+          color: const Color(0xFF7C3AED),
+        ),
+    };
+    return visual;
+  }
   return switch (item.category) {
     FeedCategory.housing => (
         icon: Icons.apartment,

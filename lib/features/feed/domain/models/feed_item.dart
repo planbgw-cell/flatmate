@@ -1,7 +1,9 @@
 import 'public_housing.dart';
+import 'public_job.dart';
 
 export 'public_housing.dart'
     show HousingType, NearbySummary, PublicHousingNotice;
+export 'public_job.dart' show PublicJobNotice, PublicJobType;
 
 /// Feed domain model + mock catalog for Step 1-3 UI.
 enum FeedCategory {
@@ -14,7 +16,7 @@ enum FeedCategory {
   String get label => switch (this) {
         FeedCategory.all => '전체',
         FeedCategory.housing => '부동산/주거',
-        FeedCategory.job => '단기 알바',
+        FeedCategory.job => '구인구직/알바',
         FeedCategory.market => '중고/나눔',
         FeedCategory.community => '동네 소식',
       };
@@ -154,14 +156,27 @@ class FeedItem {
   NearbySummary? get nearbySummary =>
       isPublicHousing ? NearbySummary.tryParse(extraMeta) : null;
 
+  /// SEOUL_JOB / GG_JOB 등 (`extra_meta.category == PUBLIC_JOB`).
+  bool get isPublicJob => extraMeta['category'] == 'PUBLIC_JOB';
+
+  /// 공공일자리 / 단기알바 / 청년인턴; null unless [isPublicJob].
+  PublicJobType? get jobType =>
+      isPublicJob ? PublicJobType.fromCode(extraMeta['job_type']) : null;
+
+  /// Parsed public job notice; null unless [isPublicJob].
+  PublicJobNotice? get publicJob => isPublicJob
+      ? PublicJobNotice.parse(description, extraMeta)
+      : null;
+
   static final _festivalPrefix = RegExp(r'^\s*\[축제\]\s*');
   static final _publicHousingPrefix = RegExp(r'^\s*\[공공 ?혜택\]\s*');
+  static final _publicJobPrefix = RegExp(r'^\s*\[공공 ?일자리\]\s*');
 
-  /// Title for display; the [축제] / [공공 혜택] badges replace the server's
-  /// title prefixes.
+  /// Title for display; badges replace the server's title prefixes.
   String get displayTitle {
     if (isFestival) return title.replaceFirst(_festivalPrefix, '');
     if (isPublicHousing) return title.replaceFirst(_publicHousingPrefix, '');
+    if (isPublicJob) return title.replaceFirst(_publicJobPrefix, '');
     return title;
   }
 

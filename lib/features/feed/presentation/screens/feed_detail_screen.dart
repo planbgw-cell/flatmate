@@ -29,6 +29,9 @@ import '../widgets/nearby_location_card.dart';
 import '../widgets/public_housing_badge.dart';
 import '../widgets/public_housing_banner.dart';
 import '../widgets/public_housing_notice_card.dart';
+import '../widgets/public_job_badge.dart';
+import '../widgets/public_job_banner.dart';
+import '../widgets/public_job_notice_card.dart';
 import '../widgets/trade_status_badge.dart';
 
 /// Feed item detail — parallax gallery, trust profile, sticky CTA.
@@ -49,9 +52,10 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
   static const _expandedHeightDefault = 340.0;
   static const _expandedHeightHousing = 220.0;
 
-  double get _expandedHeight => widget.item.isPublicHousing
-      ? _expandedHeightHousing
-      : _expandedHeightDefault;
+  double get _expandedHeight =>
+      widget.item.isPublicHousing || widget.item.isPublicJob
+          ? _expandedHeightHousing
+          : _expandedHeightDefault;
 
   @override
   void initState() {
@@ -207,6 +211,29 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     );
   }
 
+  /// Public job: [지원 사이트 이동] + optional [지도에서 보기]; no chat.
+  Widget _publicJobBar(
+    FeedItem item,
+    PublicJobNotice job,
+    bool liked,
+  ) {
+    final url = job.applyUrl;
+    final located = item.latitude != null && item.longitude != null;
+    final onApply = url == null ? null : () => _openApplySite(url);
+    final onMap = located ? () => _openOnMap(item) : null;
+    return DetailBottomBar(
+      priceOrCondition: job.wageSummary,
+      liked: liked,
+      onLikeToggle: () => toggleFeedLike(context, ref, item.id),
+      ctaLabel: onApply != null ? '지원 사이트 이동' : '지도에서 보기',
+      ctaKey: ValueKey(onApply != null ? 'detail-apply-cta' : 'detail-map-cta'),
+      onCtaPressed: onApply ?? onMap,
+      secondaryLabel: onApply != null && onMap != null ? '지도에서 보기' : null,
+      secondaryKey: const ValueKey('detail-map-cta'),
+      onSecondaryPressed: onApply != null ? onMap : null,
+    );
+  }
+
   /// 공공 주거 공고: the notice / 청약 site in the external browser.
   Future<void> _openApplySite(String url) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -268,6 +295,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     final item = ref.watch(feedItemProvider(widget.item));
     final fav = ref.watch(favoriteItemProvider(item.id));
     final notice = item.publicNotice;
+    final job = item.publicJob;
     final collapsed = _collapseT;
     final iconColor =
         Color.lerp(Colors.white, AppColors.textPrimary, collapsed)!;
@@ -325,7 +353,9 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                   onImageTap: (i) => _openGallery(item, i),
                   placeholder: item.isPublicHousing
                       ? PublicHousingBanner(item: item, large: true)
-                      : FeedPlaceholder(item: item, large: true),
+                      : item.isPublicJob
+                          ? PublicJobBanner(item: item, large: true)
+                          : FeedPlaceholder(item: item, large: true),
                 ),
               ),
             ),
@@ -362,6 +392,13 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                     ],
+                    if (item.isPublicJob) ...[
+                      PublicJobBadges(
+                        key: const ValueKey('detail-job-badges'),
+                        item: item,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -394,10 +431,15 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    // The notice card carries every line of a 공공 주거 body.
+                    // Structured cards for public housing / public jobs.
                     if (notice != null)
                       PublicHousingNoticeCard(
                         notice: notice,
+                        onOpenUrl: _openApplySite,
+                      )
+                    else if (job != null)
+                      PublicJobNoticeCard(
+                        item: item,
                         onOpenUrl: _openApplySite,
                       )
                     else
@@ -416,6 +458,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       EligibilityGuideCard(item: item),
                     ],
                     if (notice == null &&
+                        job == null &&
                         (item.detailMeta.isNotEmpty ||
                             item.extraMeta.isNotEmpty)) ...[
                       const SizedBox(height: AppSpacing.lg),
@@ -463,6 +506,8 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
         ),
         bottomNavigationBar: notice != null
             ? _publicHousingBar(item, notice, fav.isFavorite)
+            : job != null
+            ? _publicJobBar(item, job, fav.isFavorite)
             : item.isPublicData
             ? DetailBottomBar(
                 priceOrCondition: FeedExtraMeta(item.category, item.extraMeta)

@@ -17,6 +17,11 @@ abstract final class ExtraMetaKeys {
   static const workDays = 'work_days';
   static const workHours = 'work_hours';
 
+  // JOB collected from SEOUL_JOB / GG_JOB — category PUBLIC_JOB.
+  static const jobType = 'job_type';
+  static const companyName = 'company_name';
+  static const wageSummary = 'wage_summary';
+
   // GENERAL — price in 원 (server stores 0 for 나눔).
   static const price = 'price';
   static const isFree = 'is_free';

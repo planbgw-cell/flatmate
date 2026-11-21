@@ -32,7 +32,7 @@ void main() {
 
     expect(find.text('전체'), findsOneWidget);
     expect(find.text('부동산/주거'), findsOneWidget);
-    expect(find.text('단기 알바'), findsOneWidget);
+    expect(find.text('구인구직/알바'), findsOneWidget);
     expect(find.text('중고/나눔'), findsOneWidget);
     expect(find.text('동네 소식'), findsOneWidget);
 
@@ -40,7 +40,7 @@ void main() {
     expect(find.textContaining('보증금 500'), findsOneWidget);
     expect(find.byType(RefreshIndicator), findsOneWidget);
 
-    await tester.tap(find.text('단기 알바'));
+    await tester.tap(find.text('구인구직/알바'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 700));
 
