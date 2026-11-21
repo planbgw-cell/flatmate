@@ -61,15 +61,17 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
   static List<FeedItem> _visible(List<FeedItem> items, Set<String> blocked) =>
       withoutBlockedAuthors(items, blocked);
 
-  /// [부동산/주거] · [구인구직/알바] cover the dong's 권역 (`public_scope=zone`)
-  /// so 광역 public notices without coordinates show up; other chips stay
-  /// radius-based. Falls back to the radius query when the dong has no server id.
+  /// [부동산/주거] · [구인구직/알바] · [중고/나눔] cover the dong's 권역
+  /// (`public_scope=zone`) so public notices without coordinates show up;
+  /// other chips stay radius-based. Falls back to the radius query when the
+  /// dong has no server id.
   Future<List<FeedItem>> _fetch(int page) async {
     final category = ref.read(selectedCategoryProvider);
     final location = ref.read(currentLocationProvider);
     final sort = ref.read(feedSortProvider);
     if (category == FeedCategory.housing.name ||
-        category == FeedCategory.job.name) {
+        category == FeedCategory.job.name ||
+        category == FeedCategory.market.name) {
       final dongId = int.tryParse((await _serverDong())?.id ?? '');
       if (dongId != null) {
         return _repo.fetchScopedFeeds(
@@ -119,7 +121,8 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
       ..watch(locationRadiusProvider)
       ..watch(feedSortProvider);
     if (category == FeedCategory.housing.name ||
-        category == FeedCategory.job.name) {
+        category == FeedCategory.job.name ||
+        category == FeedCategory.market.name) {
       await ref.watch(serverDongProvider.future).catchError((_) => null);
     }
     return _firstPage();

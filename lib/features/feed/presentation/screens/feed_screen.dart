@@ -98,6 +98,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               caption: switch (category) {
                 FeedCategory.housing => _zoneCaption('공공 주거 공고'),
                 FeedCategory.job => _zoneCaption('공공 일자리'),
+                FeedCategory.market => _zoneCaption('공공 나눔·재활용 시설'),
                 _ => null,
               },
             ),
@@ -174,9 +175,12 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   /// (housing / job chips query `public_scope=zone`).
   String? _zoneCaption(String subject) {
     final zone = zoneOf(ref.watch(serverDongProvider).value?.cityName);
-    return zone == null
-        ? null
-        : '${zoneDescription(zone)} $subject를 함께 보여드려요';
+    if (zone == null) return null;
+    // 받침 있으면 을, 없으면 를.
+    final last = subject.runes.last;
+    final hasBatchim = ((last - 0xAC00) % 28) != 0;
+    final particle = hasBatchim ? '을' : '를';
+    return '${zoneDescription(zone)} $subject$particle 함께 보여드려요';
   }
 }
 

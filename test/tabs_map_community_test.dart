@@ -536,7 +536,7 @@ void main() {
     expect(find.byKey(const ValueKey('community-empty')), findsOneWidget);
   });
 
-  group('home [부동산/주거] · [구인구직/알바] → 권역 조회', () {
+  group('home [부동산/주거] · [구인구직/알바] · [중고/나눔] → 권역 조회', () {
     test('housing chip: zone by reverse-geo dong id + origin · sort; '
         '[전체]: radius', () async {
       final feeds = _Feeds()..zone = [_item('60', category: FeedCategory.housing)];
@@ -588,6 +588,28 @@ void main() {
       expect(call.scope, PublicScope.zone);
       expect(call.sort, FeedSort.distance);
       expect(call.origin?.latitude, kDefaultLocation.latitude);
+    });
+
+    test('market chip: zone scoped fetch (not radius)', () async {
+      final feeds = _Feeds()
+        ..zone = [_item('80', category: FeedCategory.market)];
+      final locations = _Locations();
+      final container = ProviderContainer(
+        overrides: _overrides(feeds, locations: locations),
+      );
+      addTearDown(container.dispose);
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.market.name;
+      container.read(feedSortProvider.notifier).state = FeedSort.distance;
+
+      final state = await container.read(feedListProvider.future);
+      expect(state.items.map((e) => e.id), ['80']);
+      expect(feeds.calls, isEmpty);
+      final call = feeds.scopedCalls.single;
+      expect(call.category, FeedCategory.market.name);
+      expect(call.locationId, 15);
+      expect(call.scope, PublicScope.zone);
+      expect(call.sort, FeedSort.distance);
     });
 
     test('numeric dong id is used as is (no reverse-geo)', () async {
@@ -667,6 +689,28 @@ void main() {
       );
       expect(feeds.scopedCalls.single.scope, PublicScope.zone);
       expect(feeds.scopedCalls.single.category, FeedCategory.job.name);
+    });
+
+    testWidgets('home caption: 공공 나눔·재활용 시설을 함께 보여드려요',
+        (tester) async {
+      final feeds = _Feeds();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ..._overrides(feeds),
+            selectedCategoryProvider
+                .overrideWith((ref) => FeedCategory.market.name),
+          ],
+          child: const MaterialApp(home: FeedScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('feed-zone-caption'))).data,
+        '수도권(서울·인천·경기) 공공 나눔·재활용 시설을 함께 보여드려요',
+      );
+      expect(feeds.scopedCalls.single.scope, PublicScope.zone);
+      expect(feeds.scopedCalls.single.category, FeedCategory.market.name);
     });
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/models/feed_item.dart';
 import 'public_job_banner.dart';
+import 'public_share_banner.dart';
 
 /// Icon + color per post kind, shared by thumbnails placeholders and map pins.
 ({IconData icon, Color color}) feedVisual(FeedItem item) {
@@ -28,6 +29,10 @@ import 'public_job_banner.dart';
   }
   if (item.isPublicJob) {
     final kind = JobBannerKind.fromTitle(item.title);
+    return (icon: kind.icon, color: kind.primary);
+  }
+  if (item.isPublicShare) {
+    final kind = ShareBannerKind.fromItem(item);
     return (icon: kind.icon, color: kind.primary);
   }
   return switch (item.category) {

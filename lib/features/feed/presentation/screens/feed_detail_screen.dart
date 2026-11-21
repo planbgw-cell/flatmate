@@ -33,6 +33,10 @@ import '../widgets/job_apply_guide_card.dart';
 import '../widgets/public_job_badge.dart';
 import '../widgets/public_job_banner.dart';
 import '../widgets/public_job_notice_card.dart';
+import '../widgets/public_share_badge.dart';
+import '../widgets/public_share_banner.dart';
+import '../widgets/public_share_notice_card.dart';
+import '../widgets/share_use_guide_card.dart';
 import '../widgets/trade_status_badge.dart';
 
 /// Feed item detail — parallax gallery, trust profile, sticky CTA.
@@ -54,7 +58,9 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
   static const _expandedHeightHousing = 220.0;
 
   double get _expandedHeight =>
-      widget.item.isPublicHousing || widget.item.isPublicJob
+      widget.item.isPublicHousing ||
+              widget.item.isPublicJob ||
+              widget.item.isPublicShare
           ? _expandedHeightHousing
           : _expandedHeightDefault;
 
@@ -235,6 +241,29 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     );
   }
 
+  /// Public share: [안내 사이트 이동] + optional [지도에서 보기]; no chat.
+  Widget _publicShareBar(
+    FeedItem item,
+    PublicShareNotice share,
+    bool liked,
+  ) {
+    final url = share.detailUrl;
+    final located = item.latitude != null && item.longitude != null;
+    final onInfo = url == null ? null : () => _openApplySite(url);
+    final onMap = located ? () => _openOnMap(item) : null;
+    return DetailBottomBar(
+      priceOrCondition: share.priceSummary,
+      liked: liked,
+      onLikeToggle: () => toggleFeedLike(context, ref, item.id),
+      ctaLabel: onInfo != null ? '안내 사이트 이동' : '지도에서 보기',
+      ctaKey: ValueKey(onInfo != null ? 'detail-info-cta' : 'detail-map-cta'),
+      onCtaPressed: onInfo ?? onMap,
+      secondaryLabel: onInfo != null && onMap != null ? '지도에서 보기' : null,
+      secondaryKey: const ValueKey('detail-map-cta'),
+      onSecondaryPressed: onInfo != null ? onMap : null,
+    );
+  }
+
   /// 공공 주거 공고: the notice / 청약 site in the external browser.
   Future<void> _openApplySite(String url) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -297,6 +326,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     final fav = ref.watch(favoriteItemProvider(item.id));
     final notice = item.publicNotice;
     final job = item.publicJob;
+    final share = item.publicShare;
     final collapsed = _collapseT;
     final iconColor =
         Color.lerp(Colors.white, AppColors.textPrimary, collapsed)!;
@@ -356,7 +386,9 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ? PublicHousingBanner(item: item, large: true)
                       : item.isPublicJob
                           ? PublicJobBanner(item: item, large: true)
-                          : FeedPlaceholder(item: item, large: true),
+                          : item.isPublicShare
+                              ? PublicShareBanner(item: item, large: true)
+                              : FeedPlaceholder(item: item, large: true),
                 ),
               ),
             ),
@@ -400,6 +432,13 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                     ],
+                    if (item.isPublicShare) ...[
+                      PublicShareBadges(
+                        key: const ValueKey('detail-share-badges'),
+                        item: item,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -432,7 +471,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    // Structured cards for public housing / public jobs.
+                    // Structured cards for public housing / jobs / share.
                     if (notice != null)
                       PublicHousingNoticeCard(
                         notice: notice,
@@ -440,6 +479,11 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       )
                     else if (job != null)
                       PublicJobNoticeCard(
+                        item: item,
+                        onOpenUrl: _openApplySite,
+                      )
+                    else if (share != null)
+                      PublicShareNoticeCard(
                         item: item,
                         onOpenUrl: _openApplySite,
                       )
@@ -466,8 +510,17 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
                       const SizedBox(height: AppSpacing.md),
                       JobApplyGuideCard(item: item),
                     ],
+                    if (share != null) ...[
+                      if (item.nearbySummary case final nearby?) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        NearbyLocationCard(nearby: nearby),
+                      ],
+                      const SizedBox(height: AppSpacing.md),
+                      ShareUseGuideCard(item: item),
+                    ],
                     if (notice == null &&
                         job == null &&
+                        share == null &&
                         (item.detailMeta.isNotEmpty ||
                             item.extraMeta.isNotEmpty)) ...[
                       const SizedBox(height: AppSpacing.lg),
@@ -517,6 +570,8 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
             ? _publicHousingBar(item, notice, fav.isFavorite)
             : job != null
             ? _publicJobBar(item, job, fav.isFavorite)
+            : share != null
+            ? _publicShareBar(item, share, fav.isFavorite)
             : item.isPublicData
             ? DetailBottomBar(
                 priceOrCondition: FeedExtraMeta(item.category, item.extraMeta)

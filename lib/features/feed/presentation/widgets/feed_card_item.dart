@@ -15,6 +15,7 @@ import 'festival_badge.dart';
 import 'like_heart.dart';
 import 'public_housing_badge.dart';
 import 'public_job_badge.dart';
+import 'public_share_badge.dart';
 import 'trade_status_badge.dart';
 
 class FeedCardItem extends ConsumerWidget {
@@ -52,11 +53,19 @@ class FeedCardItem extends ConsumerWidget {
     final region = zone == null ? '' : regionLabel(item.address);
     final notice = item.publicNotice;
     final job = item.publicJob;
+    final share = item.publicShare;
     final noticeRegion =
         notice == null ? '' : noticeRegionLabel(item.address ?? notice.address);
     final jobRegion = job == null
         ? ''
         : (PublicJobNotice.regionFrom(
+              address: item.address,
+              title: item.title,
+            ) ??
+            '');
+    final shareRegion = share == null
+        ? ''
+        : (PublicShareNotice.regionFrom(
               address: item.address,
               title: item.title,
             ) ??
@@ -98,6 +107,10 @@ class FeedCardItem extends ConsumerWidget {
                   ],
                   if (job != null) ...[
                     PublicJobBadges(item: item),
+                    const SizedBox(height: AppSpacing.xxs),
+                  ],
+                  if (share != null) ...[
+                    PublicShareBadges(item: item),
                     const SizedBox(height: AppSpacing.xxs),
                   ],
                   if (zone != null) ...[
@@ -188,6 +201,18 @@ class FeedCardItem extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.bodyMedium,
                     )
+                  else if (share != null)
+                    Text(
+                      [
+                        ?share.providerName,
+                        if (shareRegion.isNotEmpty) shareRegion,
+                        _timeLabel(item),
+                      ].join(' · '),
+                      key: ValueKey('feed-meta-${item.id}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyMedium,
+                    )
                   else
                     Text(
                       [
@@ -246,8 +271,18 @@ class FeedCardItem extends ConsumerWidget {
                         ),
                       ),
                     const SizedBox(height: AppSpacing.xs),
-                  ] else if (item.isFestival && festivalPeriod.isNotEmpty) ...[
+                  ] else if (share != null) ...[
                     Text(
+                      share.priceSummary,
+                      key: ValueKey('feed-share-price-${item.id}'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.titleMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ] else if (item.isFestival && festivalPeriod.isNotEmpty) ...[                    Text(
                       festivalPeriod,
                       key: ValueKey('feed-period-${item.id}'),
                       style: AppTypography.titleMedium.copyWith(

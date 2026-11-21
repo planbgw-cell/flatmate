@@ -27,6 +27,12 @@ abstract final class ExtraMetaKeys {
   static const isFree = 'is_free';
   static const canNegotiate = 'can_negotiate';
 
+  // GENERAL collected from SEOUL_SHARE / GG_SHARE — category PUBLIC_SHARE.
+  static const itemCategory = 'item_category';
+  static const providerName = 'provider_name';
+  static const priceSummary = 'price_summary';
+  static const detailUrl = 'detail_url';
+
   // LOCAL_NEWS collected from 한국관광공사 — category FESTIVAL, ISO dates.
   static const category = 'category';
   static const eventStartDate = 'event_start_date';

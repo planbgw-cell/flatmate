@@ -1,9 +1,11 @@
 import 'public_housing.dart';
 import 'public_job.dart';
+import 'public_share.dart';
 
 export 'public_housing.dart'
     show HousingType, NearbySummary, PublicHousingNotice;
 export 'public_job.dart' show PublicJobNotice, PublicJobType;
+export 'public_share.dart' show PublicShareNotice, ShareItemCategory;
 
 /// Feed domain model + mock catalog for Step 1-3 UI.
 enum FeedCategory {
@@ -154,7 +156,7 @@ class FeedItem {
 
   /// 주변 입지 요약 (`extra_meta.nearby_summary`); null when missing / empty.
   NearbySummary? get nearbySummary =>
-      isPublicHousing || isPublicJob
+      isPublicHousing || isPublicJob || isPublicShare
           ? NearbySummary.tryParse(extraMeta)
           : null;
 
@@ -170,15 +172,30 @@ class FeedItem {
       ? PublicJobNotice.parse(description, extraMeta)
       : null;
 
+  /// SEOUL_SHARE / GG_SHARE 등 (`extra_meta.category == PUBLIC_SHARE`).
+  bool get isPublicShare => extraMeta['category'] == 'PUBLIC_SHARE';
+
+  /// 재활용센터 / 공유시설 / 공공나눔; null unless [isPublicShare].
+  ShareItemCategory? get shareCategory => isPublicShare
+      ? ShareItemCategory.fromCode(extraMeta['item_category'])
+      : null;
+
+  /// Parsed public share facility; null unless [isPublicShare].
+  PublicShareNotice? get publicShare => isPublicShare
+      ? PublicShareNotice.parse(description, extraMeta)
+      : null;
+
   static final _festivalPrefix = RegExp(r'^\s*\[축제\]\s*');
   static final _publicHousingPrefix = RegExp(r'^\s*\[공공 ?혜택\]\s*');
   static final _publicJobPrefix = RegExp(r'^\s*\[공공 ?일자리\]\s*');
+  static final _publicSharePrefix = RegExp(r'^\s*\[공공 ?나눔\]\s*');
 
   /// Title for display; badges replace the server's title prefixes.
   String get displayTitle {
     if (isFestival) return title.replaceFirst(_festivalPrefix, '');
     if (isPublicHousing) return title.replaceFirst(_publicHousingPrefix, '');
     if (isPublicJob) return title.replaceFirst(_publicJobPrefix, '');
+    if (isPublicShare) return title.replaceFirst(_publicSharePrefix, '');
     return title;
   }
 
