@@ -203,7 +203,7 @@ void main() {
       expect(markerLabel(_item('1', price: '보증금 1,000 / 월세 50')), '보증금 1,00…');
       expect(
         markerLabel(_item('1', price: '', category: FeedCategory.community)),
-        '동네 소식',
+        '축제/행사',
       );
     });
   });
@@ -282,7 +282,7 @@ void main() {
     expect(container.read(feedMutationTickProvider), 1);
   });
 
-  testWidgets('bottom tabs: 5 labels; FAB only on 홈 / 동네소식', (tester) async {
+  testWidgets('bottom tabs: 5 labels; FAB only on 홈', (tester) async {
     String? pushed;
     Widget page(String name) => Scaffold(body: Text('page-$name'));
     final router = GoRouter(
@@ -300,8 +300,8 @@ void main() {
           branches: [
             for (final path in [
               RouteNames.home,
-              RouteNames.community,
               RouteNames.around,
+              RouteNames.favorites,
               RouteNames.chat,
               RouteNames.myPage,
             ])
@@ -317,18 +317,18 @@ void main() {
 
     expect(
       CustomBottomNavigationBar.items.map((e) => e.label),
-      ['홈', '동네소식', '내주변', '채팅', '마이플랫'],
+      ['홈', '동네지도', '관심목록', '채팅', '마이플랫'],
     );
-    for (final label in ['홈', '동네소식', '내주변', '채팅', '마이플랫']) {
+    for (final label in ['홈', '동네지도', '관심목록', '채팅', '마이플랫']) {
       expect(find.text(label), findsOneWidget);
     }
     expect(find.byKey(const ValueKey('write-fab')), findsOneWidget);
 
     final expectations = {
       'tab-around': (RouteNames.around, false),
+      'tab-favorites': (RouteNames.favorites, false),
       'tab-chat': (RouteNames.chat, false),
       'tab-my': (RouteNames.myPage, false),
-      'tab-community': (RouteNames.community, true),
     };
     for (final MapEntry(key: key, value: (path, fab)) in expectations.entries) {
       await tester.tap(find.byKey(ValueKey(key)));
@@ -341,8 +341,15 @@ void main() {
       );
     }
 
-    // 동네소식 FAB opens the 동네소식 form directly (no compose sheet).
+    // Home FAB opens the compose sheet (동네소식 is one of the actions).
+    await tester.tap(find.byKey(const ValueKey('tab-home')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('write-fab')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('write-fab')));
+    await tester.pumpAndSettle();
+    expect(find.text('무엇을 올릴까요?'), findsOneWidget);
+    expect(find.text('동네소식 쓰기'), findsOneWidget);
+    await tester.tap(find.text('동네소식 쓰기'));
     await tester.pumpAndSettle();
     expect(pushed, RouteNames.postCreateCommunity);
     expect(find.text('page-community-form'), findsOneWidget);
@@ -390,7 +397,8 @@ void main() {
       ]),
     );
 
-    expect(find.text('내주변 · 야탑1동'), findsOneWidget);
+    expect(find.text('동네지도 · 야탑1동'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-category-icon-bar')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-marker-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-marker-3')), findsOneWidget);
     expect(find.text('2건'), findsOneWidget);

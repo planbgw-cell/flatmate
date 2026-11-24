@@ -6,32 +6,46 @@ import '../../../feed/domain/models/feed_item.dart';
 import '../../../feed/presentation/providers/feed_provider.dart';
 import '../../../location/domain/models/location_item.dart';
 import '../../../location/presentation/providers/location_provider.dart';
+import '../../../places/domain/models/local_place.dart';
+import '../../../places/presentation/providers/places_provider.dart';
+import '../../domain/map_browse_mode.dart';
 import '../../domain/map_feed_group.dart';
 
 /// Network OSM tiles; widget tests turn them off.
 final mapTilesEnabledProvider = Provider<bool>((ref) => true);
 
-/// "지도에서 보기" request from a detail screen; the 내주변 tab centers on the
+/// "지도에서 보기" request from a detail screen; the 동네지도 tab centers on the
 /// post, selects it and clears this.
 final mapFocusProvider = StateProvider<FeedItem?>((ref) => null);
 
 class MapAroundState {
   const MapAroundState({
+    required this.mode,
     required this.centerLat,
     required this.centerLng,
     required this.items,
     required this.groups,
+    required this.places,
     this.selectedId,
+    this.selectedPlaceId,
+    this.message,
   });
 
-  /// Center of the last search (`lat` / `lng` sent to `GET /feeds`).
+  final MapBrowseMode mode;
+
+  /// Center of the last search (`lat` / `lng` sent to feeds or places).
   final double centerLat;
   final double centerLng;
 
-  /// Card order (a tapped marker's posts come first).
+  /// Card order (a tapped marker's posts come first). Feeds mode only.
   final List<FeedItem> items;
   final List<MapFeedGroup> groups;
   final String? selectedId;
+
+  /// Places mode.
+  final List<LocalPlace> places;
+  final String? selectedPlaceId;
+  final String? message;
 
   MapFeedGroup? get selectedGroup {
     final id = selectedId;
@@ -39,30 +53,65 @@ class MapAroundState {
     return groups.where((g) => g.contains(id)).firstOrNull;
   }
 
-  MapAroundState copyWith({List<FeedItem>? items, String? selectedId}) {
+  LocalPlace? get selectedPlace {
+    final id = selectedPlaceId;
+    if (id == null) return null;
+    return places.where((p) => p.placeId == id).firstOrNull;
+  }
+
+  MapAroundState copyWith({
+    MapBrowseMode? mode,
+    List<FeedItem>? items,
+    List<MapFeedGroup>? groups,
+    List<LocalPlace>? places,
+    String? selectedId,
+    String? selectedPlaceId,
+    String? message,
+    bool clearMessage = false,
+    bool clearSelectedPlace = false,
+  }) {
     return MapAroundState(
+      mode: mode ?? this.mode,
       centerLat: centerLat,
       centerLng: centerLng,
       items: items ?? this.items,
-      groups: groups,
+      groups: groups ?? this.groups,
+      places: places ?? this.places,
       selectedId: selectedId ?? this.selectedId,
+      selectedPlaceId:
+          clearSelectedPlace ? null : (selectedPlaceId ?? this.selectedPlaceId),
+      message: clearMessage ? null : (message ?? this.message),
     );
   }
 }
 
-/// 내주변: posts within [radiusKm] of the current dong (or a re-searched
-/// map center), grouped into markers.
+/// 동네지도: feed pins within [radiusKm], or nearby places by category.
 class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
   static const radiusKm = 3.0;
+  static const placesRadiusM = 1000;
   static const pageSize = 100;
+
+  MapBrowseMode _mode = MapBrowseMode.feeds;
 
   @override
   Future<MapAroundState> build() {
     final dong = ref.watch(currentLocationProvider);
-    return _load(dong.latitude, dong.longitude);
+    return _load(dong.latitude, dong.longitude, _mode);
   }
 
-  Future<MapAroundState> _load(double lat, double lng) async {
+  Future<MapAroundState> _load(
+    double lat,
+    double lng,
+    MapBrowseMode mode,
+  ) async {
+    _mode = mode;
+    if (mode is MapBrowsePlaces) {
+      return _loadPlaces(lat, lng, mode.category);
+    }
+    return _loadFeeds(lat, lng);
+  }
+
+  Future<MapAroundState> _loadFeeds(double lat, double lng) async {
     final dong = ref.read(currentLocationProvider);
     final center = LocationItem(
       id: 'map-center',
@@ -83,31 +132,63 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
         .where((item) => feedPosition(item) != null)
         .toList();
     return MapAroundState(
+      mode: MapBrowseMode.feeds,
       centerLat: lat,
       centerLng: lng,
       items: items,
       groups: groupFeedsByPosition(items),
+      places: const [],
       selectedId: items.firstOrNull?.id,
     );
   }
 
-  /// "이 위치에서 재검색" / "내 동네로". The current markers stay until the
-  /// new result lands.
-  Future<void> searchAt(double lat, double lng) async {
-    // A still-running first load must not overwrite this result.
-    try {
-      await future;
-    } catch (_) {
-      // Replaced by the search below.
-    }
-    state = await AsyncValue.guard(() => _load(lat, lng));
+  Future<MapAroundState> _loadPlaces(
+    double lat,
+    double lng,
+    PlaceCategory category,
+  ) async {
+    final result = await ref.read(placesRepositoryProvider).nearby(
+          lat: lat,
+          lng: lng,
+          category: category,
+          radius: placesRadiusM,
+          limit: 20,
+        );
+    return MapAroundState(
+      mode: MapBrowsePlaces(category),
+      centerLat: lat,
+      centerLng: lng,
+      items: const [],
+      groups: const [],
+      places: result.items,
+      selectedPlaceId: result.items.firstOrNull?.placeId,
+      message: result.message,
+    );
   }
 
-  /// Marker tap: that position's posts move to the front of the cards
-  /// ([focusId] first when given).
+  Future<void> setMode(MapBrowseMode mode) async {
+    if (_mode == mode && state.hasValue) return;
+    final current = state.value;
+    final lat = current?.centerLat ?? ref.read(currentLocationProvider).latitude;
+    final lng =
+        current?.centerLng ?? ref.read(currentLocationProvider).longitude;
+    try {
+      await future;
+    } catch (_) {}
+    state = await AsyncValue.guard(() => _load(lat, lng, mode));
+  }
+
+  /// "이 지역 재검색" / "내 동네로". Markers stay until the new result lands.
+  Future<void> searchAt(double lat, double lng) async {
+    try {
+      await future;
+    } catch (_) {}
+    state = await AsyncValue.guard(() => _load(lat, lng, _mode));
+  }
+
   void select(MapFeedGroup group, {String? focusId}) {
     final current = state.value;
-    if (current == null) return;
+    if (current == null || !current.mode.isFeeds) return;
     final ids = {for (final item in group.items) item.id};
     final groupItems = [
       ...group.items.where((item) => item.id == focusId),
@@ -124,20 +205,30 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     );
   }
 
-  /// "지도에서 보기": search around [item] and select it.
+  void selectPlace(LocalPlace place) {
+    final current = state.value;
+    if (current == null || current.mode.isFeeds) return;
+    if (current.selectedPlaceId == place.placeId) return;
+    state = AsyncData(current.copyWith(selectedPlaceId: place.placeId));
+  }
+
+  /// "지도에서 보기": switch to feeds mode, search around [item], select it.
   Future<void> focus(FeedItem item) async {
     final position = feedPosition(item);
     if (position == null) return;
+    _mode = MapBrowseMode.feeds;
     await searchAt(position.lat, position.lng);
     var current = state.value;
     if (current == null) return;
     if (!current.items.any((e) => e.id == item.id)) {
       final items = [item, ...current.items];
       current = MapAroundState(
+        mode: MapBrowseMode.feeds,
         centerLat: current.centerLat,
         centerLng: current.centerLng,
         items: items,
         groups: groupFeedsByPosition(items),
+        places: const [],
       );
       state = AsyncData(current);
     }
@@ -150,6 +241,12 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     final current = state.value;
     if (current == null || current.selectedId == feedId) return;
     state = AsyncData(current.copyWith(selectedId: feedId));
+  }
+
+  void clearMessage() {
+    final current = state.value;
+    if (current == null || current.message == null) return;
+    state = AsyncData(current.copyWith(clearMessage: true));
   }
 }
 

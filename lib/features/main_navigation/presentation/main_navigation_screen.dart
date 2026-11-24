@@ -7,15 +7,14 @@ import '../../../core/common_widgets/custom_bottom_navigation_bar.dart';
 import '../../../core/theme/app_colors.dart';
 import 'widgets/write_compose_sheet.dart';
 
-/// Main shell: 홈 · 동네소식 · 내주변 · 채팅 · 마이플랫, each tab preserved via
-/// [StatefulNavigationShell] (IndexedStack). Scroll-triggered 글쓰기 FAB.
+/// Main shell: 홈 · 동네지도 · 관심목록 · 채팅 · 마이플랫.
+/// Each tab is preserved via [StatefulNavigationShell] (IndexedStack).
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   static const homeIndex = 0;
-  static const communityIndex = 1;
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -26,10 +25,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   int get _index => widget.navigationShell.currentIndex;
 
-  /// 내주변 (map + cards), 채팅 and 마이플랫 have no 글쓰기.
-  bool get _showFab =>
-      _index == MainNavigationScreen.homeIndex ||
-      _index == MainNavigationScreen.communityIndex;
+  /// 글쓰기 FAB is home-only.
+  bool get _showFab => _index == MainNavigationScreen.homeIndex;
 
   void _onTabTap(int index) {
     widget.navigationShell.goBranch(
@@ -52,10 +49,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Future<void> _onWritePressed() async {
-    if (_index == MainNavigationScreen.communityIndex) {
-      context.push(RouteNames.postCreateCommunity);
-      return;
-    }
     final action = await showWriteComposeSheet(context);
     if (!mounted || action == null) return;
 

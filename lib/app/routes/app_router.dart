@@ -214,16 +214,16 @@ GoRouter createAppRouter({String? initialLocation}) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RouteNames.community,
-                builder: (context, state) => const CommunityTab(),
+                path: RouteNames.around,
+                builder: (context, state) => const MapAroundTab(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RouteNames.around,
-                builder: (context, state) => const MapAroundTab(),
+                path: RouteNames.favorites,
+                builder: (context, state) => const FavoritesTab(),
               ),
             ],
           ),

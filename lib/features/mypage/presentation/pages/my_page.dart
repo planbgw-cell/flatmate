@@ -17,7 +17,7 @@ import '../../../feed/presentation/feed_actions.dart';
 import '../providers/my_feeds_provider.dart';
 import '../widgets/my_feed_tile.dart';
 
-/// 내 정보: profile + [내 판매글] / [관심목록] tabs when signed in.
+/// 내 정보: profile + 내 판매글 (관심목록은 하단 탭).
 class MyPage extends ConsumerWidget {
   const MyPage({super.key});
 
@@ -63,44 +63,46 @@ class MyPage extends ConsumerWidget {
       );
     }
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(title: const Text('내 정보')),
-        body: Column(
-          children: [
-            _ProfileHeader(user: user),
-            const _NoticesMenuTile(),
-            ListTile(
-              key: const ValueKey('menu-blocked-users'),
-              dense: true,
-              leading: const Icon(
-                Icons.block,
-                color: AppColors.textSecondary,
+    return Scaffold(
+      appBar: AppBar(title: const Text('내 정보')),
+      body: Column(
+        children: [
+          _ProfileHeader(user: user),
+          const _NoticesMenuTile(),
+          ListTile(
+            key: const ValueKey('menu-blocked-users'),
+            dense: true,
+            leading: const Icon(
+              Icons.block,
+              color: AppColors.textSecondary,
+            ),
+            title: Text('차단 사용자 관리', style: AppTypography.bodyLarge),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: AppColors.textHint,
+            ),
+            onTap: () => context.push(RouteNames.blockedUsers),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '내 판매글',
+                key: const ValueKey('tab-my-feeds'),
+                style: AppTypography.titleMedium,
               ),
-              title: Text('차단 사용자 관리', style: AppTypography.bodyLarge),
-              trailing: const Icon(
-                Icons.chevron_right,
-                color: AppColors.textHint,
-              ),
-              onTap: () => context.push(RouteNames.blockedUsers),
             ),
-            const Divider(height: 1),
-            const TabBar(
-              labelColor: AppColors.textPrimary,
-              unselectedLabelColor: AppColors.textHint,
-              indicatorColor: AppColors.textPrimary,
-              tabs: [
-                Tab(key: ValueKey('tab-my-feeds'), text: '내 판매글'),
-                Tab(key: ValueKey('tab-my-likes'), text: '관심목록'),
-              ],
-            ),
-            const Divider(height: 1),
-            const Expanded(
-              child: TabBarView(children: [_MyFeedsTab(), _MyLikesTab()]),
-            ),
-          ],
-        ),
+          ),
+          const Divider(height: 1),
+          const Expanded(child: _MyFeedsTab()),
+        ],
       ),
     );
   }
@@ -264,44 +266,6 @@ class _MyFeedsTab extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MyLikesTab extends ConsumerWidget {
-  const _MyLikesTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final likesAsync = ref.watch(myLikesProvider);
-    return _AsyncList(
-      value: likesAsync,
-      emptyText: '관심 표시한 글이 없어요.\n마음에 드는 글에 하트를 눌러 보세요.',
-      onRefresh: () => ref.refresh(myLikesProvider.future),
-      itemBuilder: (item) => MyFeedTile(
-        key: ValueKey('my-like-${item.id}'),
-        item: item,
-        onTap: () => _openDetail(context, item),
-        trailing: IconButton(
-          key: ValueKey('my-like-heart-${item.id}'),
-          tooltip: '관심 해제',
-          icon: const Icon(Icons.favorite_rounded, color: AppColors.primary),
-          onPressed: () async {
-            final messenger = ScaffoldMessenger.of(context);
-            try {
-              await ref.read(myLikesProvider.notifier).unlike(item);
-            } catch (e) {
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(
-                    e is ApiException ? e.message : '관심 해제에 실패했어요.',
-                  ),
-                ),
-              );
-            }
-          },
-        ),
-      ),
     );
   }
 }

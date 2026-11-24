@@ -34,7 +34,8 @@ void main() {
     expect(find.text('부동산/주거'), findsOneWidget);
     expect(find.text('구인구직/알바'), findsOneWidget);
     expect(find.text('중고/나눔'), findsOneWidget);
-    expect(find.text('동네 소식'), findsOneWidget);
+    expect(find.text('축제/행사'), findsOneWidget);
+    expect(find.text('동네 소식'), findsNothing);
 
     expect(find.textContaining('신촌 풀옵션 원룸'), findsOneWidget);
     expect(find.textContaining('보증금 500'), findsOneWidget);

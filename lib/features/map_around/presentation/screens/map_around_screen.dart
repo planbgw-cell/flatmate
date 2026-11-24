@@ -12,12 +12,17 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../feed/domain/models/feed_item.dart';
 import '../../../location/domain/models/location_item.dart';
 import '../../../location/presentation/providers/location_provider.dart';
+import '../../../places/domain/models/local_place.dart';
+import '../../domain/map_browse_mode.dart';
 import '../../domain/map_feed_group.dart';
 import '../providers/map_around_provider.dart';
+import '../widgets/map_category_icon_bar.dart';
 import '../widgets/map_feed_carousel.dart';
 import '../widgets/map_feed_marker.dart';
+import '../widgets/map_place_card.dart';
+import '../widgets/map_place_marker.dart';
 
-/// Tab 2 — 내주변: posts within 3 km on an OSM map with a card carousel.
+/// Tab — 동네지도: feed pins or nearby places on an OSM map.
 class MapAroundScreen extends ConsumerStatefulWidget {
   const MapAroundScreen({super.key});
 
@@ -29,7 +34,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
   static const _zoom = 14.0;
   static const _focusZoom = 15.0;
 
-  /// Map drag beyond this offers "이 위치에서 재검색".
+  /// Map drag beyond this offers "이 지역 재검색".
   static const _researchKm = 0.3;
 
   final _mapController = MapController();
@@ -44,7 +49,6 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
   @override
   void initState() {
     super.initState();
-    // Opened via "지도에서 보기" before this tab was ever built.
     final focus = ref.read(mapFocusProvider);
     final focusAt = focus == null ? null : feedPosition(focus);
     final dong = ref.read(currentLocationProvider);
@@ -128,6 +132,16 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     await _search(dong.latitude, dong.longitude);
   }
 
+  Future<void> _onModeChanged(MapBrowseMode mode) async {
+    setState(() {
+      _searching = true;
+      _showResearch = false;
+    });
+    await ref.read(mapAroundProvider.notifier).setMode(mode);
+    if (!mounted) return;
+    setState(() => _searching = false);
+  }
+
   void _onMarkerTap(MapFeedGroup group) {
     ref.read(mapAroundProvider.notifier).select(group);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -140,6 +154,11 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
         );
       }
     });
+  }
+
+  void _onPlaceTap(LocalPlace place) {
+    ref.read(mapAroundProvider.notifier).selectPlace(place);
+    _moveTo(place.lat, place.lng);
   }
 
   void _onPageChanged(List<FeedItem> items, int index) {
@@ -158,6 +177,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     final aroundAsync = ref.watch(mapAroundProvider);
     final around = aroundAsync.value;
     final showTiles = ref.watch(mapTilesEnabledProvider);
+    final mode = around?.mode ?? MapBrowseMode.feeds;
 
     ref.listen(mapFocusProvider, (previous, next) {
       if (next == null) return;
@@ -173,9 +193,20 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
       final newSearch = after != null &&
           (before == null ||
               before.centerLat != after.centerLat ||
-              before.centerLng != after.centerLng);
+              before.centerLng != after.centerLng ||
+              before.mode != after.mode);
       if (newSearch && _pageController.hasClients) {
         _pageController.jumpToPage(0);
+      }
+      final message = after?.message;
+      if (message != null && message != before?.message && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+          ref.read(mapAroundProvider.notifier).clearMessage();
+        });
       }
     });
 
@@ -184,123 +215,160 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
       ...?around?.groups.where((g) => g != selectedGroup),
       ?selectedGroup,
     ];
+    final places = around?.places ?? const <LocalPlace>[];
+    final selectedPlace = around?.selectedPlace;
     final loading = _searching || (aroundAsync.isLoading && around == null);
+    final circleRadiusM = mode.isFeeds
+        ? MapAroundNotifier.radiusKm * 1000
+        : MapAroundNotifier.placesRadiusM.toDouble();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('내주변 · ${dong.dongName}', style: AppTypography.header2),
+        title: Text('동네지도 · ${dong.dongName}', style: AppTypography.header2),
       ),
-      body: Stack(
+      body: Column(
         children: [
-          FlutterMap(
-            key: const ValueKey('map-around'),
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _initialCenter,
-              initialZoom: _initialZoom,
-              minZoom: 8,
-              maxZoom: 18,
-              backgroundColor: AppColors.surface,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-              onMapReady: () => _mapReady = true,
-              onMapEvent: _onMapEvent,
-            ),
-            children: [
-              if (showTiles) ...[
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.flatmate.flatmate_app',
-                ),
-                const SimpleAttributionWidget(
-                  source: Text('OpenStreetMap contributors'),
-                  alignment: Alignment.topRight,
-                ),
-              ],
-              if (around != null)
-                CircleLayer(
-                  circles: [
-                    CircleMarker(
-                      point: LatLng(around.centerLat, around.centerLng),
-                      radius: MapAroundNotifier.radiusKm * 1000,
-                      useRadiusInMeter: true,
-                      color: AppColors.primary.withValues(alpha: 0.06),
-                      borderColor: AppColors.primary.withValues(alpha: 0.45),
-                      borderStrokeWidth: 1.5,
+          MapCategoryIconBar(
+            mode: mode,
+            onChanged: _searching ? (_) {} : _onModeChanged,
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                FlutterMap(
+                  key: const ValueKey('map-around'),
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _initialCenter,
+                    initialZoom: _initialZoom,
+                    minZoom: 8,
+                    maxZoom: 18,
+                    backgroundColor: AppColors.surface,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                     ),
+                    onMapReady: () => _mapReady = true,
+                    onMapEvent: _onMapEvent,
+                  ),
+                  children: [
+                    if (showTiles) ...[
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.flatmate.flatmate_app',
+                      ),
+                      const SimpleAttributionWidget(
+                        source: Text('OpenStreetMap contributors'),
+                        alignment: Alignment.topRight,
+                      ),
+                    ],
+                    if (around != null)
+                      CircleLayer(
+                        circles: [
+                          CircleMarker(
+                            point: LatLng(around.centerLat, around.centerLng),
+                            radius: circleRadiusM,
+                            useRadiusInMeter: true,
+                            color: AppColors.primary.withValues(alpha: 0.06),
+                            borderColor:
+                                AppColors.primary.withValues(alpha: 0.45),
+                            borderStrokeWidth: 1.5,
+                          ),
+                        ],
+                      ),
+                    if (mode.isFeeds)
+                      MarkerLayer(
+                        markers: [
+                          for (final group in groups)
+                            Marker(
+                              key: ValueKey('map-marker-${group.id}'),
+                              point: LatLng(group.latitude, group.longitude),
+                              width: MapFeedMarker.width,
+                              height: MapFeedMarker.height,
+                              alignment: Alignment.topCenter,
+                              child: MapFeedMarker(
+                                group: group,
+                                selected: group == selectedGroup,
+                                onTap: () => _onMarkerTap(group),
+                              ),
+                            ),
+                        ],
+                      )
+                    else
+                      MarkerLayer(
+                        markers: [
+                          for (final place in places)
+                            Marker(
+                              key: ValueKey('map-place-${place.placeId}'),
+                              point: LatLng(place.lat, place.lng),
+                              width: MapPlaceMarker.width,
+                              height: MapPlaceMarker.height,
+                              alignment: Alignment.topCenter,
+                              child: MapPlaceMarker(
+                                place: place,
+                                selected:
+                                    place.placeId == selectedPlace?.placeId,
+                                onTap: () => _onPlaceTap(place),
+                              ),
+                            ),
+                        ],
+                      ),
                   ],
                 ),
-              MarkerLayer(
-                markers: [
-                  for (final group in groups)
-                    Marker(
-                      key: ValueKey('map-marker-${group.id}'),
-                      point: LatLng(group.latitude, group.longitude),
-                      width: MapFeedMarker.width,
-                      height: MapFeedMarker.height,
-                      alignment: Alignment.topCenter,
-                      child: MapFeedMarker(
-                        group: group,
-                        selected: group == selectedGroup,
-                        onTap: () => _onMarkerTap(group),
+                if (loading)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                if (_showResearch)
+                  Positioned(
+                    top: AppSpacing.sm,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: FilledButton.icon(
+                        key: const ValueKey('map-research'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primary,
+                          elevation: 3,
+                          shape: const StadiumBorder(),
+                        ),
+                        onPressed: _searching ? null : _researchHere,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('이 지역 재검색'),
                       ),
                     ),
-                ],
-              ),
-            ],
-          ),
-          if (loading)
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: LinearProgressIndicator(minHeight: 2),
-            ),
-          if (_showResearch)
-            Positioned(
-              top: AppSpacing.sm,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: FilledButton.icon(
-                  key: const ValueKey('map-research'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    elevation: 3,
-                    shape: const StadiumBorder(),
                   ),
-                  onPressed: _searching ? null : _researchHere,
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('이 위치에서 재검색'),
-                ),
-              ),
-            ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: AppSpacing.md,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(
-                    right: AppSpacing.md,
-                    bottom: AppSpacing.sm,
-                  ),
-                  child: FloatingActionButton.small(
-                    key: const ValueKey('map-recenter'),
-                    heroTag: 'map-recenter',
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    tooltip: '내 동네로',
-                    onPressed: _searching ? null : _recenter,
-                    child: const Icon(Icons.my_location),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: AppSpacing.md,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          right: AppSpacing.md,
+                          bottom: AppSpacing.sm,
+                        ),
+                        child: FloatingActionButton.small(
+                          key: const ValueKey('map-recenter'),
+                          heroTag: 'map-recenter',
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primary,
+                          tooltip: '내 동네로',
+                          onPressed: _searching ? null : _recenter,
+                          child: const Icon(Icons.my_location),
+                        ),
+                      ),
+                      _bottom(aroundAsync, around),
+                    ],
                   ),
                 ),
-                _bottom(aroundAsync, around),
               ],
             ),
           ),
@@ -314,10 +382,21 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
       if (!aroundAsync.hasError) return const SizedBox.shrink();
       final error = aroundAsync.error;
       return _InfoCard(
-        text: error is ApiException ? error.message : '주변 게시글을 불러오지 못했어요.',
+        text: error is ApiException ? error.message : '주변 정보를 불러오지 못했어요.',
         actionLabel: '다시 시도',
         onAction: () => ref.invalidate(mapAroundProvider),
       );
+    }
+    if (!around.mode.isFeeds) {
+      final place = around.selectedPlace;
+      if (around.places.isEmpty) {
+        return _InfoCard(
+          key: const ValueKey('map-places-empty'),
+          text: around.message ?? '이 지역에 결과가 없어요. 지도를 옮긴 뒤 재검색해 보세요.',
+        );
+      }
+      if (place == null) return const SizedBox.shrink();
+      return MapPlaceCard(place: place);
     }
     if (around.items.isEmpty) {
       return const _InfoCard(

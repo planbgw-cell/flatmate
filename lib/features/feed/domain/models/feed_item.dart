@@ -20,7 +20,7 @@ enum FeedCategory {
         FeedCategory.housing => '부동산/주거',
         FeedCategory.job => '구인구직/알바',
         FeedCategory.market => '중고/나눔',
-        FeedCategory.community => '동네 소식',
+        FeedCategory.community => '축제/행사',
       };
 }
 

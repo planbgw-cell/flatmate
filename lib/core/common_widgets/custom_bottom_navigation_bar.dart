@@ -26,16 +26,16 @@ class CustomBottomNavigationBar extends StatelessWidget {
       label: '홈',
     ),
     (
-      key: 'tab-community',
-      icon: Icons.campaign_outlined,
-      activeIcon: Icons.campaign,
-      label: '동네소식',
-    ),
-    (
       key: 'tab-around',
       icon: Icons.map_outlined,
       activeIcon: Icons.map,
-      label: '내주변',
+      label: '동네지도',
+    ),
+    (
+      key: 'tab-favorites',
+      icon: Icons.favorite_border,
+      activeIcon: Icons.favorite,
+      label: '관심목록',
     ),
     (
       key: 'tab-chat',

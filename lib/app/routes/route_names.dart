@@ -8,6 +8,7 @@ abstract final class RouteNames {
   static const shareFeed = '/share/feed/:id';
   static const community = '/community';
   static const around = '/around';
+  static const favorites = '/favorites';
   static const search = '/search';
   static const notices = '/notices';
   static const noticeDetail = '/notices/detail';
