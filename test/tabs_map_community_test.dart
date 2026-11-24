@@ -203,7 +203,7 @@ void main() {
       expect(markerLabel(_item('1', price: '보증금 1,000 / 월세 50')), '보증금 1,00…');
       expect(
         markerLabel(_item('1', price: '', category: FeedCategory.community)),
-        '축제/행사',
+        '축제·나들이',
       );
     });
   });
@@ -348,8 +348,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('write-fab')));
     await tester.pumpAndSettle();
     expect(find.text('무엇을 올릴까요?'), findsOneWidget);
-    expect(find.text('동네소식 쓰기'), findsOneWidget);
-    await tester.tap(find.text('동네소식 쓰기'));
+    expect(find.text('축제·나들이 쓰기'), findsOneWidget);
+    await tester.tap(find.text('축제·나들이 쓰기'));
     await tester.pumpAndSettle();
     expect(pushed, RouteNames.postCreateCommunity);
     expect(find.text('page-community-form'), findsOneWidget);
@@ -544,7 +544,7 @@ void main() {
     expect(find.byKey(const ValueKey('community-empty')), findsOneWidget);
   });
 
-  group('home [부동산/주거] · [구인구직/알바] · [중고/나눔] → 권역 조회', () {
+  group('home [룸메·주거] · [일자리·알바] · [나눔·공유] · [축제·나들이] → 권역 조회', () {
     test('housing chip: zone by reverse-geo dong id + origin · sort; '
         '[전체]: radius', () async {
       final feeds = _Feeds()..zone = [_item('60', category: FeedCategory.housing)];
@@ -719,6 +719,50 @@ void main() {
       );
       expect(feeds.scopedCalls.single.scope, PublicScope.zone);
       expect(feeds.scopedCalls.single.category, FeedCategory.market.name);
+    });
+
+    test('community chip: zone scoped fetch (not radius)', () async {
+      final feeds = _Feeds()
+        ..zone = [_item('90', category: FeedCategory.community)];
+      final locations = _Locations();
+      final container = ProviderContainer(
+        overrides: _overrides(feeds, locations: locations),
+      );
+      addTearDown(container.dispose);
+      container.read(selectedCategoryProvider.notifier).state =
+          FeedCategory.community.name;
+
+      final state = await container.read(feedListProvider.future);
+      expect(state.items.map((e) => e.id), ['90']);
+      expect(feeds.calls, isEmpty);
+      final call = feeds.scopedCalls.single;
+      expect(call.category, FeedCategory.community.name);
+      expect(call.locationId, 15);
+      expect(call.scope, PublicScope.zone);
+    });
+
+    testWidgets('home caption: 내 권역 전체 축제·나들이 소식을 모아봤어요',
+        (tester) async {
+      final feeds = _Feeds();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ..._overrides(feeds),
+            selectedCategoryProvider
+                .overrideWith((ref) => FeedCategory.community.name),
+          ],
+          child: const MaterialApp(home: FeedScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('feed-zone-caption'))).data,
+        '내 권역 전체 축제·나들이 소식을 모아봤어요',
+      );
+      expect(feeds.scopedCalls.single.scope, PublicScope.zone);
+      expect(feeds.scopedCalls.single.category, FeedCategory.community.name);
+      expect(find.text('룸메·주거'), findsOneWidget);
+      expect(find.text('축제·나들이'), findsWidgets);
     });
   });
 

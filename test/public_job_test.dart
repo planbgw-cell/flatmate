@@ -184,7 +184,7 @@ void main() {
       expect(item.jobType, PublicJobType.publicWork);
       expect(item.sourceName, '서울시 공공일자리');
       expect(item.displayTitle, '서대문구 환경정비 공공근로');
-      expect(FeedCategory.job.label, '구인구직/알바');
+      expect(FeedCategory.job.label, '일자리·알바');
 
       final job = item.publicJob!;
       expect(job.companyName, '서대문구청');

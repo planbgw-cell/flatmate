@@ -99,6 +99,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 FeedCategory.housing => _zoneCaption('공공 주거 공고'),
                 FeedCategory.job => _zoneCaption('공공 일자리'),
                 FeedCategory.market => _zoneCaption('공공 나눔·재활용 시설'),
+                FeedCategory.community =>
+                  '내 권역 전체 축제·나들이 소식을 모아봤어요',
                 _ => null,
               },
             ),
@@ -172,7 +174,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   }
 
   /// "수도권(서울·인천·경기) …를 함께 보여드려요" once the dong's 권역 is known
-  /// (housing / job chips query `public_scope=zone`).
+  /// (housing / job / market / community chips query `public_scope=zone`).
   String? _zoneCaption(String subject) {
     final zone = zoneOf(ref.watch(serverDongProvider).value?.cityName);
     if (zone == null) return null;

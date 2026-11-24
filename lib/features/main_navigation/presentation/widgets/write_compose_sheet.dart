@@ -6,7 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 
 enum WriteComposeAction { property, job, post, community }
 
-/// Bottom sheet: 부동산 등록 / 알바 공고 / 일반글 작성 / 동네소식 쓰기
+/// Bottom sheet: 룸메·주거 / 일자리·알바 / 나눔·공유 / 축제·나들이
 Future<WriteComposeAction?> showWriteComposeSheet(BuildContext context) {
   return showModalBottomSheet<WriteComposeAction>(
     context: context,
@@ -51,26 +51,26 @@ class WriteComposeSheet extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             _WriteOptionTile(
               icon: Icons.apartment_outlined,
-              title: '부동산 / 주거 등록',
+              title: '룸메·주거 등록',
               subtitle: '단기임대 · 원룸 · 룸메이트',
               onTap: () => Navigator.pop(context, WriteComposeAction.property),
             ),
             _WriteOptionTile(
               icon: Icons.work_outline,
-              title: '알바 공고 등록',
+              title: '일자리·알바 공고',
               subtitle: '단기 알바 · 심부름',
               onTap: () => Navigator.pop(context, WriteComposeAction.job),
             ),
             _WriteOptionTile(
               icon: Icons.edit_outlined,
-              title: '일반글 작성',
-              subtitle: '동네생활 · 중고 · 기타',
+              title: '나눔·공유 글쓰기',
+              subtitle: '동네생활 · 중고 · 나눔',
               onTap: () => Navigator.pop(context, WriteComposeAction.post),
             ),
             _WriteOptionTile(
               icon: Icons.campaign_outlined,
-              title: '동네소식 쓰기',
-              subtitle: '우리 동네 소식 · 정보 공유',
+              title: '축제·나들이 쓰기',
+              subtitle: '우리 동네 축제 · 나들이 정보',
               onTap: () =>
                   Navigator.pop(context, WriteComposeAction.community),
             ),

@@ -17,10 +17,10 @@ enum FeedCategory {
 
   String get label => switch (this) {
         FeedCategory.all => '전체',
-        FeedCategory.housing => '부동산/주거',
-        FeedCategory.job => '구인구직/알바',
-        FeedCategory.market => '중고/나눔',
-        FeedCategory.community => '축제/행사',
+        FeedCategory.housing => '룸메·주거',
+        FeedCategory.job => '일자리·알바',
+        FeedCategory.market => '나눔·공유',
+        FeedCategory.community => '축제·나들이',
       };
 }
 
@@ -42,9 +42,9 @@ enum FeedBadge {
         FeedBadge.recruiting => '모집중',
         FeedBadge.sharing => '나눔',
         FeedBadge.bumped => '끌올',
-        FeedBadge.housing => '주거',
-        FeedBadge.market => '중고',
-        FeedBadge.community => '동네',
+        FeedBadge.housing => '룸메·주거',
+        FeedBadge.market => '나눔·공유',
+        FeedBadge.community => '축제·나들이',
       };
 }
 

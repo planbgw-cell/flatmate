@@ -31,17 +31,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.text('전체'), findsOneWidget);
-    expect(find.text('부동산/주거'), findsOneWidget);
-    expect(find.text('구인구직/알바'), findsOneWidget);
-    expect(find.text('중고/나눔'), findsOneWidget);
-    expect(find.text('축제/행사'), findsOneWidget);
-    expect(find.text('동네 소식'), findsNothing);
+    expect(find.text('룸메·주거'), findsWidgets);
+    expect(find.text('일자리·알바'), findsWidgets);
+    expect(find.text('나눔·공유'), findsWidgets);
+    expect(find.text('축제·나들이'), findsWidgets);
+    expect(find.text('축제/행사'), findsNothing);
 
     expect(find.textContaining('신촌 풀옵션 원룸'), findsOneWidget);
     expect(find.textContaining('보증금 500'), findsOneWidget);
     expect(find.byType(RefreshIndicator), findsOneWidget);
 
-    await tester.tap(find.text('구인구직/알바'));
+    await tester.tap(find.text('일자리·알바'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 700));
 
