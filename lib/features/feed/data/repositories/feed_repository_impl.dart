@@ -18,6 +18,7 @@ class FeedRepositoryImpl implements FeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+    String? employmentType,
   }) {
     return _mock.fetchFeeds(
       page: page,
@@ -26,6 +27,7 @@ class FeedRepositoryImpl implements FeedRepository {
       location: location,
       radiusKm: radiusKm,
       sort: sort,
+      employmentType: employmentType,
     );
   }
 
@@ -55,6 +57,7 @@ class FeedRepositoryImpl implements FeedRepository {
     FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
+    String? employmentType,
   }) =>
       _mock.fetchScopedFeeds(
         category: category,
@@ -64,6 +67,7 @@ class FeedRepositoryImpl implements FeedRepository {
         sort: sort,
         page: page,
         pageSize: pageSize,
+        employmentType: employmentType,
       );
 
   @override

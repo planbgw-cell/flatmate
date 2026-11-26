@@ -144,6 +144,7 @@ class MockFeedRepository implements FeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+    String? employmentType,
   }) async {
     await _delay();
     if (page < 1) return const [];
@@ -172,6 +173,7 @@ class MockFeedRepository implements FeedRepository {
     FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
+    String? employmentType,
   }) async {
     await _delay();
     if (page < 1) return const [];

@@ -41,6 +41,7 @@ class _ControlledRepo extends MockFeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+    String? employmentType,
   }) async =>
       const [];
 

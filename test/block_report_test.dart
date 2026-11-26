@@ -43,6 +43,7 @@ class _Feeds extends MockFeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+    String? employmentType,
   }) async {
     fetches++;
     return [_item('1', '21'), _item('2', '22'), _item('3', '21')];

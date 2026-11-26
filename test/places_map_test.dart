@@ -96,6 +96,7 @@ class _Feeds extends MockFeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+    String? employmentType,
   }) async {
     if (page > 1) return const [];
     return around;

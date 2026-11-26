@@ -24,6 +24,7 @@ class DioFeedRepository implements FeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
+    String? employmentType,
   }) async {
     final feedType = feedTypeForCategoryKey(category);
     final response = await _api.get<dynamic>(
@@ -37,6 +38,7 @@ class DioFeedRepository implements FeedRepository {
         if (location != null) 'radius_m': (radiusKm * 1000).round(),
         // The server rejects `distance` without coordinates.
         'sort': location == null ? FeedSort.latest.name : sort.name,
+        'employment_type': ?employmentType,
       },
     );
     return _parseList(response.data);
@@ -51,6 +53,7 @@ class DioFeedRepository implements FeedRepository {
     FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
+    String? employmentType,
   }) async {
     final response = await _api.get<dynamic>(
       '/feeds',
@@ -64,6 +67,7 @@ class DioFeedRepository implements FeedRepository {
         'sort': origin == null ? FeedSort.latest.name : sort.name,
         'page': page,
         'limit': pageSize,
+        'employment_type': ?employmentType,
       },
     );
     return _parseList(response.data);
