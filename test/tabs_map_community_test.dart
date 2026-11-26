@@ -70,7 +70,6 @@ class _Feeds extends MockFeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
-    String? employmentType,
   }) async {
     calls.add((
       category: category,
@@ -88,7 +87,6 @@ class _Feeds extends MockFeedRepository {
     PublicScope scope,
     LocationItem? origin,
     FeedSort sort,
-    String? employmentType,
   })>[];
   List<FeedItem> zone = const [];
 
@@ -101,7 +99,6 @@ class _Feeds extends MockFeedRepository {
     FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
-    String? employmentType,
   }) async {
     scopedCalls.add((
       category: category,
@@ -109,7 +106,6 @@ class _Feeds extends MockFeedRepository {
       scope: scope,
       origin: origin,
       sort: sort,
-      employmentType: employmentType,
     ));
     if (page > 1) return const [];
     return scope == PublicScope.zone ? zone : community;
@@ -600,7 +596,6 @@ void main() {
       expect(call.scope, PublicScope.zone);
       expect(call.sort, FeedSort.distance);
       expect(call.origin?.latitude, kDefaultLocation.latitude);
-      expect(call.employmentType, 'ALL');
     });
 
     test('market chip: zone scoped fetch (not radius)', () async {

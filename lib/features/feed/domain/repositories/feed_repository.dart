@@ -27,14 +27,12 @@ abstract class FeedRepository {
     LocationItem? location,
     double radiusKm = 3,
     FeedSort sort = FeedSort.latest,
-    String? employmentType,
   });
 
   /// [category] posts by server dong (`GET /feeds?location_id=&public_scope=`):
   /// posts of that dong plus public data (축제 / 공공 주거) within [scope],
   /// including notices without coordinates. [origin] only fills `distance_m`
   /// (and enables `sort=distance`); it does not narrow the scope.
-  /// [employmentType] is `ALL`/`PART_TIME`/`INTERN`/`PUBLIC` for job feeds.
   Future<List<FeedItem>> fetchScopedFeeds({
     required String category,
     required int locationId,
@@ -43,7 +41,6 @@ abstract class FeedRepository {
     FeedSort sort = FeedSort.latest,
     int page = 1,
     int pageSize = 20,
-    String? employmentType,
   });
 
   /// Single post detail by id.

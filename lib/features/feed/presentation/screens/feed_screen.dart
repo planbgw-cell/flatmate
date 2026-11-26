@@ -11,7 +11,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../location/presentation/providers/location_provider.dart';
 import '../../../location/presentation/widgets/location_select_modal.dart';
-import '../../domain/models/employment_type.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/models/region.dart';
 import '../../domain/repositories/feed_repository.dart';
@@ -19,7 +18,6 @@ import '../feed_actions.dart';
 import '../providers/feed_provider.dart';
 import '../widgets/feed_card_item.dart';
 import '../widgets/feed_filter_bar.dart';
-import '../widgets/job_employment_filter_bar.dart';
 
 /// Tab 0 — 통합 피드 (Riverpod + 무한 스크롤 + Pull-to-Refresh).
 class FeedScreen extends ConsumerStatefulWidget {
@@ -91,20 +89,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
               selected: category,
               onSelected: (value) {
                 ref.read(selectedCategoryProvider.notifier).state = value.name;
-                if (value != FeedCategory.job) {
-                  ref.read(selectedEmploymentTypeProvider.notifier).state =
-                      EmploymentType.all;
-                }
               },
             ),
-            if (category == FeedCategory.job)
-              JobEmploymentFilterBar(
-                selected: ref.watch(selectedEmploymentTypeProvider),
-                onSelected: (type) {
-                  ref.read(selectedEmploymentTypeProvider.notifier).state =
-                      type;
-                },
-              ),
             _FeedSortBar(
               selected: ref.watch(feedSortProvider),
               onSelected: (sort) =>
@@ -125,9 +111,6 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 error: (error, _) => Center(child: Text('$error')),
                 data: (data) {
                   final items = data.items;
-                  final emptyText = category == FeedCategory.job
-                      ? '선택한 조건의 일자리 공고가 아직 없어요'
-                      : '${category.label} 게시글이 아직 없습니다.';
                   return RefreshIndicator(
                     color: AppColors.primary,
                     onRefresh: () =>
@@ -141,8 +124,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                                     MediaQuery.sizeOf(context).height * 0.4,
                                 child: Center(
                                   child: Text(
-                                    emptyText,
-                                    key: const ValueKey('feed-empty-text'),
+                                    '${category.label} 게시글이 아직 없습니다.',
                                     style: AppTypography.bodyMedium,
                                   ),
                                 ),

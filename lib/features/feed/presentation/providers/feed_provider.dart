@@ -7,7 +7,6 @@ import '../../../../core/di/injection.dart';
 import '../../../block_report/presentation/providers/blocked_users_provider.dart';
 import '../../../location/domain/models/location_item.dart';
 import '../../../location/presentation/providers/location_provider.dart';
-import '../../domain/models/employment_type.dart';
 import '../../domain/models/feed_item.dart';
 import '../../domain/repositories/feed_repository.dart';
 
@@ -19,11 +18,6 @@ final feedRepositoryProvider = Provider<FeedRepository>((ref) {
 /// Selected category filter key (`all`, `housing`, `job`, …).
 final selectedCategoryProvider = StateProvider<String>((ref) {
   return FeedCategory.all.name;
-});
-
-/// Job-chip employment sub-filter (`GET /feeds?employment_type=`).
-final selectedEmploymentTypeProvider = StateProvider<EmploymentType>((ref) {
-  return EmploymentType.all;
 });
 
 /// Daangn-style default: newest first within the selected radius.
@@ -75,9 +69,6 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
     final category = ref.read(selectedCategoryProvider);
     final location = ref.read(currentLocationProvider);
     final sort = ref.read(feedSortProvider);
-    final employmentType = category == FeedCategory.job.name
-        ? ref.read(selectedEmploymentTypeProvider).code
-        : null;
     if (category == FeedCategory.housing.name ||
         category == FeedCategory.job.name ||
         category == FeedCategory.market.name ||
@@ -92,7 +83,6 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
           sort: sort,
           page: page,
           pageSize: _pageSize,
-          employmentType: employmentType,
         );
       }
     }
@@ -103,7 +93,6 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
       location: location,
       radiusKm: ref.read(locationRadiusProvider),
       sort: sort,
-      employmentType: employmentType,
     );
   }
 
@@ -132,9 +121,6 @@ class FeedListNotifier extends AsyncNotifier<FeedListState> {
       ..watch(currentLocationProvider)
       ..watch(locationRadiusProvider)
       ..watch(feedSortProvider);
-    if (category == FeedCategory.job.name) {
-      ref.watch(selectedEmploymentTypeProvider);
-    }
     if (category == FeedCategory.housing.name ||
         category == FeedCategory.job.name ||
         category == FeedCategory.market.name ||
