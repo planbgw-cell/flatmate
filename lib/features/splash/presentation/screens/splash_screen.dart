@@ -67,7 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppColors.background,
       body: FadeTransition(
         opacity: _fade,
         child: ScaleTransition(
@@ -76,34 +76,16 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                SvgPicture.asset(
+                  'assets/icons/flatmate_logo.svg',
                   width: 88,
                   height: 88,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: SvgPicture.asset(
-                    'assets/icons/flatmate_logo.svg',
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.primary,
-                      BlendMode.srcIn,
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   'Flatmate',
                   style: AppTypography.header1.copyWith(
-                    color: Colors.white,
+                    color: AppColors.primary,
                     fontSize: 32,
                     letterSpacing: -0.5,
                   ),
@@ -112,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
                 Text(
                   '우리 동네 자취·알바·생활정보',
                   style: AppTypography.bodyMedium.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -121,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen>
                   height: 22,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.2,
-                    color: Colors.white,
+                    color: AppColors.primary,
                   ),
                 ),
               ],
