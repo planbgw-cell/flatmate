@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
 import '../../../places/domain/models/local_place.dart';
+import 'map_marker_style_cache.dart';
 
 class MapPlaceMarker extends StatelessWidget {
   const MapPlaceMarker({
@@ -51,20 +51,9 @@ class MapPlaceMarker extends StatelessWidget {
             duration: const Duration(milliseconds: 150),
             width: size,
             height: size,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected ? AppColors.primary : Colors.white,
-                width: selected ? 3 : 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            decoration: MapMarkerStyleCache.placeDecoration(
+              category: place.category,
+              selected: selected,
             ),
             child: Icon(iconFor(place.category), size: 16, color: Colors.white),
           ),

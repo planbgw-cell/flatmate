@@ -21,6 +21,7 @@ import 'package:flatmate_app/features/map_around/presentation/providers/map_arou
 import 'package:flatmate_app/features/map_around/presentation/screens/map_around_screen.dart';
 import 'package:flatmate_app/features/post_create/presentation/providers/create_post_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -399,6 +400,14 @@ void main() {
 
     expect(find.text('동네지도 · 야탑1동'), findsOneWidget);
     expect(find.byKey(const ValueKey('map-category-icon-bar')), findsOneWidget);
+
+    // Zoom past cluster threshold so individual feed pins render.
+    final map = tester.widget<FlutterMap>(
+      find.byKey(const ValueKey('map-around')),
+    );
+    map.mapController!.move(map.mapController!.camera.center, 15);
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const ValueKey('map-marker-1')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-marker-3')), findsOneWidget);
     expect(find.text('2건'), findsOneWidget);

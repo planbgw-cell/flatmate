@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,8 +17,10 @@ import '../../../location/presentation/providers/location_provider.dart';
 import '../../../places/domain/models/local_place.dart';
 import '../../domain/map_browse_mode.dart';
 import '../../domain/map_feed_group.dart';
+import '../../domain/map_marker_cluster.dart';
 import '../providers/map_around_provider.dart';
 import '../widgets/map_category_icon_bar.dart';
+import '../widgets/map_cluster_badge.dart';
 import '../widgets/map_feed_carousel.dart';
 import '../widgets/map_feed_marker.dart';
 import '../widgets/map_place_card.dart';
@@ -31,9 +35,11 @@ class MapAroundScreen extends ConsumerStatefulWidget {
   ConsumerState<MapAroundScreen> createState() => _MapAroundScreenState();
 }
 
-class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
+class _MapAroundScreenState extends ConsumerState<MapAroundScreen>
+    with SingleTickerProviderStateMixin {
   static const _zoom = 14.0;
   static const _focusZoom = 15.0;
+  static const _viewportMargin = 0.15;
 
   /// Map drag beyond this offers "이 지역 재검색".
   static const _researchKm = 0.3;
@@ -46,6 +52,12 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
   bool _mapReady = false;
   bool _showResearch = false;
   bool _searching = false;
+
+  List<MapOverlayItem> _overlays = const [];
+  Map<String, MapFeedGroup> _feedById = const {};
+  Map<String, LocalPlace> _placeById = const {};
+
+  AnimationController? _camAnim;
 
   @override
   void initState() {
@@ -75,11 +87,13 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     await ref.read(mapAroundProvider.notifier).focus(item);
     if (!mounted) return;
     setState(() => _searching = false);
+    _rebuildOverlays();
     if (_pageController.hasClients) _pageController.jumpToPage(0);
   }
 
   @override
   void dispose() {
+    _camAnim?.dispose();
     _mapController.dispose();
     _pageController.dispose();
     super.dispose();
@@ -91,12 +105,109 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
       LatLng(lat, lng),
       zoom ?? _mapController.camera.zoom,
     );
+    _rebuildOverlays();
+  }
+
+  Future<void> _animateTo(double lat, double lng, {required double zoom}) async {
+    if (!_mapReady) return;
+    _camAnim?.stop();
+    _camAnim?.dispose();
+    final from = _mapController.camera.center;
+    final fromZoom = _mapController.camera.zoom;
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _camAnim = controller;
+    final curved = CurvedAnimation(parent: controller, curve: Curves.easeOut);
+    void tick() {
+      final t = curved.value;
+      _mapController.move(
+        LatLng(
+          from.latitude + (lat - from.latitude) * t,
+          from.longitude + (lng - from.longitude) * t,
+        ),
+        fromZoom + (zoom - fromZoom) * t,
+      );
+    }
+
+    curved.addListener(tick);
+    await controller.forward();
+    curved.removeListener(tick);
+    controller.dispose();
+    if (_camAnim == controller) _camAnim = null;
+    if (mounted) _rebuildOverlays();
+  }
+
+  void _rebuildOverlays() {
+    if (!_mapReady || !mounted) return;
+    final around = ref.read(mapAroundProvider).value;
+    if (around == null) {
+      if (_overlays.isNotEmpty) {
+        setState(() {
+          _overlays = const [];
+          _feedById = const {};
+          _placeById = const {};
+        });
+      }
+      return;
+    }
+
+    final zoom = _mapController.camera.zoom;
+    final bounds = _usableViewportBounds();
+    final List<MapClusterPoint> points;
+    if (around.mode.isFeeds) {
+      _feedById = {for (final g in around.groups) g.id: g};
+      _placeById = const {};
+      points = [
+        for (final g in around.groups)
+          MapClusterPoint(id: g.id, lat: g.latitude, lng: g.longitude),
+      ];
+    } else {
+      _placeById = {for (final p in around.places) p.placeId: p};
+      _feedById = const {};
+      points = [
+        for (final p in around.places)
+          MapClusterPoint(id: p.placeId, lat: p.lat, lng: p.lng),
+      ];
+    }
+    var next = clusterMapPoints(points: points, zoom: zoom, bounds: bounds);
+    // Degenerate camera bounds (common in early layout / tests) would hide
+    // every pin — fall back to clustering without a viewport filter.
+    if (next.isEmpty && points.isNotEmpty && bounds != null) {
+      next = clusterMapPoints(points: points, zoom: zoom);
+    }
+    setState(() => _overlays = next);
+  }
+
+  /// Padded visible region, or null when the camera bounds are unusable.
+  MapLatLngBounds? _usableViewportBounds() {
+    final b = _mapController.camera.visibleBounds;
+    if (!(b.north > b.south) || !(b.east != b.west)) return null;
+    if ((b.north - b.south).abs() < 1e-9) return null;
+    return MapLatLngBounds(
+      south: b.south,
+      west: b.west,
+      north: b.north,
+      east: b.east,
+    ).padded(_viewportMargin);
+  }
+
+  void _onClusterTap(MapOverlayCluster cluster) {
+    final zoom = math.max(_mapController.camera.zoom + 2.0, _focusZoom);
+    _animateTo(cluster.lat, cluster.lng, zoom: zoom);
   }
 
   void _onMapEvent(MapEvent event) {
     final userMoveEnded = event is MapEventMoveEnd ||
         event is MapEventFlingAnimationEnd ||
         event is MapEventDoubleTapZoomEnd;
+    // Programmatic MapController.move (tests / non-animated) — not drag ticks.
+    final controllerMove = event is MapEventMove &&
+        event.source == MapEventSource.mapController &&
+        _camAnim == null;
+    if (!userMoveEnded && !controllerMove) return;
+    _rebuildOverlays();
     if (!userMoveEnded) return;
     final current = ref.read(mapAroundProvider).value;
     if (current == null) return;
@@ -119,6 +230,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     await ref.read(mapAroundProvider.notifier).searchAt(lat, lng);
     if (!mounted) return;
     setState(() => _searching = false);
+    _rebuildOverlays();
   }
 
   Future<void> _researchHere() async {
@@ -141,6 +253,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     await ref.read(mapAroundProvider.notifier).setMode(mode);
     if (!mounted) return;
     setState(() => _searching = false);
+    _rebuildOverlays();
   }
 
   Future<void> _openPlaceSearch() async {
@@ -172,6 +285,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     await ref.read(mapAroundProvider.notifier).clearSearch();
     if (!mounted) return;
     setState(() => _searching = false);
+    _rebuildOverlays();
   }
 
   void _onMarkerTap(MapFeedGroup group) {
@@ -203,6 +317,72 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
 
   void _open(FeedItem item) => context.push(RouteNames.feedDetail, extra: item);
 
+  List<Marker> _buildMarkers({
+    required MapBrowseMode mode,
+    required MapFeedGroup? selectedGroup,
+    required LocalPlace? selectedPlace,
+  }) {
+    final markers = <Marker>[];
+    for (final item in _overlays) {
+      switch (item) {
+        case MapOverlayCluster():
+          markers.add(
+            Marker(
+              key: ValueKey(
+                'map-cluster-${item.lat.toStringAsFixed(5)}-'
+                '${item.lng.toStringAsFixed(5)}-${item.count}',
+              ),
+              point: LatLng(item.lat, item.lng),
+              width: MapClusterBadge.width,
+              height: MapClusterBadge.height,
+              alignment: Alignment.center,
+              child: MapClusterBadge(
+                count: item.count,
+                onTap: () => _onClusterTap(item),
+              ),
+            ),
+          );
+        case MapOverlayPin(:final id, :final lat, :final lng):
+          if (mode.isFeeds) {
+            final group = _feedById[id];
+            if (group == null) continue;
+            markers.add(
+              Marker(
+                key: ValueKey('map-marker-${group.id}'),
+                point: LatLng(lat, lng),
+                width: MapFeedMarker.width,
+                height: MapFeedMarker.height,
+                alignment: Alignment.topCenter,
+                child: MapFeedMarker(
+                  group: group,
+                  selected: group == selectedGroup,
+                  onTap: () => _onMarkerTap(group),
+                ),
+              ),
+            );
+          } else {
+            final place = _placeById[id];
+            if (place == null) continue;
+            markers.add(
+              Marker(
+                key: ValueKey('map-place-${place.placeId}'),
+                point: LatLng(lat, lng),
+                width: MapPlaceMarker.width,
+                height: MapPlaceMarker.height,
+                alignment: Alignment.topCenter,
+                child: MapPlaceMarker(
+                  place: place,
+                  selected: place.placeId == selectedPlace?.placeId,
+                  onTap: () => _onPlaceTap(place),
+                ),
+              ),
+            );
+          }
+      }
+    }
+    return markers;
+  }
+
   @override
   Widget build(BuildContext context) {
     final dong = ref.watch(currentLocationProvider);
@@ -230,6 +410,11 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
       if (newSearch && _pageController.hasClients) {
         _pageController.jumpToPage(0);
       }
+      if (after != before) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _rebuildOverlays();
+        });
+      }
       final message = after?.message;
       if (message != null && message != before?.message && mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -243,11 +428,6 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     });
 
     final selectedGroup = around?.selectedGroup;
-    final groups = [
-      ...?around?.groups.where((g) => g != selectedGroup),
-      ?selectedGroup,
-    ];
-    final places = around?.places ?? const <LocalPlace>[];
     final selectedPlace = around?.selectedPlace;
     final loading = _searching || (aroundAsync.isLoading && around == null);
     final circleRadiusM = mode.isFeeds
@@ -269,7 +449,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
               color: AppColors.textPrimary,
               size: 26,
             ),
-            onPressed: _searching ? null : _openPlaceSearch,
+            onPressed: _openPlaceSearch,
           ),
         ],
       ),
@@ -277,7 +457,7 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
         children: [
           MapCategoryIconBar(
             mode: mode,
-            onChanged: _searching ? (_) {} : _onModeChanged,
+            onChanged: _onModeChanged,
           ),
           Expanded(
             child: Stack(
@@ -294,7 +474,10 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
                     interactionOptions: const InteractionOptions(
                       flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                     ),
-                    onMapReady: () => _mapReady = true,
+                    onMapReady: () {
+                      _mapReady = true;
+                      _rebuildOverlays();
+                    },
                     onMapEvent: _onMapEvent,
                   ),
                   children: [
@@ -323,43 +506,13 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
                           ),
                         ],
                       ),
-                    if (mode.isFeeds)
-                      MarkerLayer(
-                        markers: [
-                          for (final group in groups)
-                            Marker(
-                              key: ValueKey('map-marker-${group.id}'),
-                              point: LatLng(group.latitude, group.longitude),
-                              width: MapFeedMarker.width,
-                              height: MapFeedMarker.height,
-                              alignment: Alignment.topCenter,
-                              child: MapFeedMarker(
-                                group: group,
-                                selected: group == selectedGroup,
-                                onTap: () => _onMarkerTap(group),
-                              ),
-                            ),
-                        ],
-                      )
-                    else
-                      MarkerLayer(
-                        markers: [
-                          for (final place in places)
-                            Marker(
-                              key: ValueKey('map-place-${place.placeId}'),
-                              point: LatLng(place.lat, place.lng),
-                              width: MapPlaceMarker.width,
-                              height: MapPlaceMarker.height,
-                              alignment: Alignment.topCenter,
-                              child: MapPlaceMarker(
-                                place: place,
-                                selected:
-                                    place.placeId == selectedPlace?.placeId,
-                                onTap: () => _onPlaceTap(place),
-                              ),
-                            ),
-                        ],
+                    MarkerLayer(
+                      markers: _buildMarkers(
+                        mode: mode,
+                        selectedGroup: selectedGroup,
+                        selectedPlace: selectedPlace,
                       ),
+                    ),
                   ],
                 ),
                 if (loading)

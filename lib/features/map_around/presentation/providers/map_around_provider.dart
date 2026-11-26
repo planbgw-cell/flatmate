@@ -85,19 +85,75 @@ class MapAroundState {
   }
 }
 
+class _CacheEntry {
+  const _CacheEntry(this.state, this.storedAt);
+
+  final MapAroundState state;
+  final DateTime storedAt;
+}
+
 /// 동네지도: feed pins, category places, or keyword search places.
 class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
   static const radiusKm = 3.0;
   static const placesRadiusM = 1000;
   static const searchRadiusM = 2000;
   static const pageSize = 100;
+  static const cacheTtl = Duration(minutes: 2);
 
   MapBrowseMode _mode = MapBrowseMode.feeds;
+  int _requestSeq = 0;
+  final Map<String, _CacheEntry> _cache = {};
+
+  /// Latest request sequence (tests assert stale discard).
+  int get requestSeq => _requestSeq;
 
   @override
-  Future<MapAroundState> build() {
+  Future<MapAroundState> build() async {
     final dong = ref.watch(currentLocationProvider);
-    return _load(dong.latitude, dong.longitude, _mode);
+    final seq = ++_requestSeq;
+    final loaded =
+        await _loadAndCache(dong.latitude, dong.longitude, _mode);
+    if (seq != _requestSeq) {
+      return state.value ?? loaded;
+    }
+    return loaded;
+  }
+
+  String _cacheKey(MapBrowseMode mode, double lat, double lng) {
+    final gLat = (lat * 1000).round();
+    final gLng = (lng * 1000).round();
+    final modeKey = switch (mode) {
+      MapBrowseFeeds() => 'feeds',
+      MapBrowsePlaces(:final category) => 'places:${category.name}',
+      MapBrowseSearch(:final query) => 'search:$query',
+    };
+    return '$modeKey|$gLat|$gLng';
+  }
+
+  MapAroundState? _cacheGet(MapBrowseMode mode, double lat, double lng) {
+    final key = _cacheKey(mode, lat, lng);
+    final entry = _cache[key];
+    if (entry == null) return null;
+    if (DateTime.now().difference(entry.storedAt) > cacheTtl) {
+      _cache.remove(key);
+      return null;
+    }
+    return entry.state;
+  }
+
+  void _cachePut(MapAroundState value) {
+    _cache[_cacheKey(value.mode, value.centerLat, value.centerLng)] =
+        _CacheEntry(value, DateTime.now());
+  }
+
+  Future<MapAroundState> _loadAndCache(
+    double lat,
+    double lng,
+    MapBrowseMode mode,
+  ) async {
+    final loaded = await _load(lat, lng, mode);
+    _cachePut(loaded);
+    return loaded;
   }
 
   Future<MapAroundState> _load(
@@ -105,9 +161,10 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     double lng,
     MapBrowseMode mode,
   ) async {
-    _mode = mode;
+    // Do not assign `_mode` here — a stale in-flight load must not clobber it.
     return switch (mode) {
-      MapBrowsePlaces(:final category) => _loadPlacesByCategory(lat, lng, category),
+      MapBrowsePlaces(:final category) =>
+        _loadPlacesByCategory(lat, lng, category),
       MapBrowseSearch(:final query) => _loadPlacesByQuery(lat, lng, query),
       MapBrowseFeeds() => _loadFeeds(lat, lng),
     };
@@ -192,16 +249,35 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     );
   }
 
+  /// Apply [result] only if [seq] is still the latest request.
+  bool _commit(int seq, AsyncValue<MapAroundState> result) {
+    if (seq != _requestSeq) return false;
+    if (result case AsyncData(:final value)) {
+      _cachePut(value);
+    }
+    state = result;
+    return true;
+  }
+
   Future<void> setMode(MapBrowseMode mode) async {
     if (_mode == mode && state.hasValue) return;
     final current = state.value;
     final lat = current?.centerLat ?? ref.read(currentLocationProvider).latitude;
     final lng =
         current?.centerLng ?? ref.read(currentLocationProvider).longitude;
-    try {
-      await future;
-    } catch (_) {}
-    state = await AsyncValue.guard(() => _load(lat, lng, mode));
+
+    final cached = _cacheGet(mode, lat, lng);
+    if (cached != null) {
+      _requestSeq++;
+      _mode = mode;
+      state = AsyncData(cached);
+      return;
+    }
+
+    final seq = ++_requestSeq;
+    _mode = mode;
+    final result = await AsyncValue.guard(() => _load(lat, lng, mode));
+    _commit(seq, result);
   }
 
   /// Apply a keyword search hit: show [places] with [selected] focused.
@@ -212,22 +288,23 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     required double centerLat,
     required double centerLng,
   }) {
+    _requestSeq++;
     _mode = MapBrowseSearch(query);
     final ordered = [
       selected,
       ...places.where((p) => p.placeId != selected.placeId),
     ];
-    state = AsyncData(
-      MapAroundState(
-        mode: MapBrowseSearch(query),
-        centerLat: centerLat,
-        centerLng: centerLng,
-        items: const [],
-        groups: const [],
-        places: ordered,
-        selectedPlaceId: selected.placeId,
-      ),
+    final next = MapAroundState(
+      mode: MapBrowseSearch(query),
+      centerLat: centerLat,
+      centerLng: centerLng,
+      items: const [],
+      groups: const [],
+      places: ordered,
+      selectedPlaceId: selected.placeId,
     );
+    _cachePut(next);
+    state = AsyncData(next);
   }
 
   /// Leave keyword search and restore 피드/공공.
@@ -236,20 +313,36 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     final lat = current?.centerLat ?? ref.read(currentLocationProvider).latitude;
     final lng =
         current?.centerLng ?? ref.read(currentLocationProvider).longitude;
-    try {
-      await future;
-    } catch (_) {}
-    state = await AsyncValue.guard(
+
+    final cached = _cacheGet(MapBrowseMode.feeds, lat, lng);
+    if (cached != null) {
+      _requestSeq++;
+      _mode = MapBrowseMode.feeds;
+      state = AsyncData(cached);
+      return;
+    }
+
+    final seq = ++_requestSeq;
+    _mode = MapBrowseMode.feeds;
+    final result = await AsyncValue.guard(
       () => _load(lat, lng, MapBrowseMode.feeds),
     );
+    _commit(seq, result);
   }
 
   /// "이 지역 재검색" / "내 동네로". Markers stay until the new result lands.
   Future<void> searchAt(double lat, double lng) async {
-    try {
-      await future;
-    } catch (_) {}
-    state = await AsyncValue.guard(() => _load(lat, lng, _mode));
+    final mode = _mode;
+    final cached = _cacheGet(mode, lat, lng);
+    if (cached != null) {
+      _requestSeq++;
+      state = AsyncData(cached);
+      return;
+    }
+
+    final seq = ++_requestSeq;
+    final result = await AsyncValue.guard(() => _load(lat, lng, mode));
+    _commit(seq, result);
   }
 
   void select(MapFeedGroup group, {String? focusId}) {
@@ -314,6 +407,9 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     if (current == null || current.message == null) return;
     state = AsyncData(current.copyWith(clearMessage: true));
   }
+
+  /// Test helper: seed cache without network.
+  void debugPutCache(MapAroundState value) => _cachePut(value);
 }
 
 final mapAroundProvider =

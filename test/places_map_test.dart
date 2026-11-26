@@ -17,6 +17,7 @@ import 'package:flatmate_app/features/map_around/domain/map_browse_mode.dart';
 import 'package:flatmate_app/features/map_around/presentation/providers/map_around_provider.dart';
 import 'package:flatmate_app/features/map_around/presentation/screens/map_around_screen.dart';
 import 'package:flatmate_app/features/map_around/presentation/widgets/map_category_icon_bar.dart';
+import 'package:flatmate_app/features/map_around/presentation/widgets/map_cluster_badge.dart';
 import 'package:flatmate_app/features/map_around/presentation/widgets/map_place_card.dart';
 import 'package:flatmate_app/features/map_around/presentation/widgets/map_place_search_overlay.dart';
 import 'package:flatmate_app/features/places/data/repositories/dio_places_repository.dart';
@@ -24,6 +25,7 @@ import 'package:flatmate_app/features/places/domain/models/local_place.dart';
 import 'package:flatmate_app/features/places/domain/repositories/places_repository.dart';
 import 'package:flatmate_app/features/places/presentation/providers/places_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -423,9 +425,69 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('map-cat-음식점')));
     await tester.pumpAndSettle();
+
+    // Ensure pin mode (single place may already show; zoom past threshold).
+    final map = tester.widget<FlutterMap>(
+      find.byKey(const ValueKey('map-around')),
+    );
+    map.mapController!.move(map.mapController!.camera.center, 15);
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const ValueKey('map-place-p1')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-place-card')), findsOneWidget);
     expect(find.text('카카오맵 상세보기'), findsOneWidget);
+  });
+
+  testWidgets('feed zoom-out shows cluster badge; tap zooms in', (tester) async {
+    tester.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    final feeds = _Feeds(
+      around: [
+        for (var i = 0; i < 8; i++)
+          FeedItem(
+            id: '$i',
+            title: '글$i',
+            neighborhood: '야탑동',
+            postedAt: DateTime(2026, 10, 24),
+            priceOrCondition: '1만원',
+            thumbnailUrl: '',
+            likeCount: 0,
+            chatCount: 0,
+            category: FeedCategory.market,
+            badges: const [],
+            isBumped: false,
+            latitude: 37.412 + i * 0.00005,
+            longitude: 127.130 + i * 0.00005,
+          ),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          feedRepositoryProvider.overrideWithValue(feeds),
+          placesRepositoryProvider.overrideWithValue(_Places()),
+          currentLocationProvider.overrideWith((ref) => _yatap),
+          mapTilesEnabledProvider.overrideWithValue(false),
+        ],
+        child: const MaterialApp(home: MapAroundScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final map = tester.widget<FlutterMap>(
+      find.byKey(const ValueKey('map-around')),
+    );
+    map.mapController!.move(map.mapController!.camera.center, 12);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MapClusterBadge), findsWidgets);
+
+    await tester.tap(find.byType(MapClusterBadge).first);
+    await tester.pumpAndSettle();
+    expect(map.mapController!.camera.zoom, greaterThanOrEqualTo(14));
   });
 
   testWidgets('map search: suggestions → result → card + clear badge',
