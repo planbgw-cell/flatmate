@@ -11,16 +11,20 @@ class DioPlacesRepository implements PlacesRepository {
   Future<NearbyPlacesResult> nearby({
     required double lat,
     required double lng,
-    required PlaceCategory category,
+    PlaceCategory? category,
+    String? q,
     int radius = 1000,
     int limit = 20,
   }) async {
+    final query = q?.trim();
     final response = await _api.get<dynamic>(
       '/places/nearby',
       queryParameters: {
         'lat': lat,
         'lng': lng,
-        'category': category.code,
+        if (query != null && query.isNotEmpty) 'q': query,
+        if ((query == null || query.isEmpty) && category != null)
+          'category': category.code,
         'radius': radius,
         'limit': limit,
       },

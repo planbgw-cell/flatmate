@@ -21,6 +21,7 @@ import '../widgets/map_feed_carousel.dart';
 import '../widgets/map_feed_marker.dart';
 import '../widgets/map_place_card.dart';
 import '../widgets/map_place_marker.dart';
+import '../widgets/map_place_search_overlay.dart';
 
 /// Tab — 동네지도: feed pins or nearby places on an OSM map.
 class MapAroundScreen extends ConsumerStatefulWidget {
@@ -142,6 +143,37 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     setState(() => _searching = false);
   }
 
+  Future<void> _openPlaceSearch() async {
+    final center = _mapReady
+        ? _mapController.camera.center
+        : _initialCenter;
+    final result = await MapPlaceSearchOverlay.open(
+      context,
+      lat: center.latitude,
+      lng: center.longitude,
+    );
+    if (!mounted || result == null) return;
+    ref.read(mapAroundProvider.notifier).applySearch(
+          query: result.query,
+          places: result.places,
+          selected: result.selected,
+          centerLat: center.latitude,
+          centerLng: center.longitude,
+        );
+    _moveTo(result.selected.lat, result.selected.lng, zoom: _focusZoom);
+    setState(() => _showResearch = false);
+  }
+
+  Future<void> _clearPlaceSearch() async {
+    setState(() {
+      _searching = true;
+      _showResearch = false;
+    });
+    await ref.read(mapAroundProvider.notifier).clearSearch();
+    if (!mounted) return;
+    setState(() => _searching = false);
+  }
+
   void _onMarkerTap(MapFeedGroup group) {
     ref.read(mapAroundProvider.notifier).select(group);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -220,12 +252,26 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
     final loading = _searching || (aroundAsync.isLoading && around == null);
     final circleRadiusM = mode.isFeeds
         ? MapAroundNotifier.radiusKm * 1000
-        : MapAroundNotifier.placesRadiusM.toDouble();
+        : mode.isSearch
+            ? MapAroundNotifier.searchRadiusM.toDouble()
+            : MapAroundNotifier.placesRadiusM.toDouble();
+    final searchQuery = mode.searchQuery;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text('동네지도 · ${dong.dongName}', style: AppTypography.header2),
+        actions: [
+          IconButton(
+            key: const ValueKey('map-search-button'),
+            icon: const Icon(
+              Icons.search,
+              color: AppColors.textPrimary,
+              size: 26,
+            ),
+            onPressed: _searching ? null : _openPlaceSearch,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -323,7 +369,26 @@ class _MapAroundScreenState extends ConsumerState<MapAroundScreen> {
                     right: 0,
                     child: LinearProgressIndicator(minHeight: 2),
                   ),
-                if (_showResearch)
+                if (searchQuery != null)
+                  Positioned(
+                    top: AppSpacing.sm,
+                    left: AppSpacing.md,
+                    right: AppSpacing.md,
+                    child: Center(
+                      child: ActionChip(
+                        key: const ValueKey('map-search-clear-badge'),
+                        avatar: const Icon(Icons.close, size: 16),
+                        label: Text(
+                          '‘$searchQuery’ 검색 결과 · 초기화',
+                          style: AppTypography.badgeText,
+                        ),
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: AppColors.primary),
+                        onPressed: _searching ? null : _clearPlaceSearch,
+                      ),
+                    ),
+                  )
+                else if (_showResearch)
                   Positioned(
                     top: AppSpacing.sm,
                     left: 0,

@@ -1,6 +1,6 @@
 import '../../places/domain/models/local_place.dart';
 
-/// 동네지도 icon-bar selection: feed pins or a place category.
+/// 동네지도 icon-bar / keyword search selection.
 sealed class MapBrowseMode {
   const MapBrowseMode();
 
@@ -8,9 +8,18 @@ sealed class MapBrowseMode {
 
   bool get isFeeds => this is MapBrowseFeeds;
 
+  bool get isSearch => this is MapBrowseSearch;
+
+  bool get showsPlaces => this is MapBrowsePlaces || this is MapBrowseSearch;
+
   PlaceCategory? get placeCategory => switch (this) {
         MapBrowsePlaces(:final category) => category,
-        MapBrowseFeeds() => null,
+        MapBrowseFeeds() || MapBrowseSearch() => null,
+      };
+
+  String? get searchQuery => switch (this) {
+        MapBrowseSearch(:final query) => query,
+        _ => null,
       };
 }
 
@@ -35,4 +44,17 @@ final class MapBrowsePlaces extends MapBrowseMode {
 
   @override
   int get hashCode => category.hashCode;
+}
+
+final class MapBrowseSearch extends MapBrowseMode {
+  const MapBrowseSearch(this.query);
+
+  final String query;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapBrowseSearch && other.query == query;
+
+  @override
+  int get hashCode => query.hashCode;
 }

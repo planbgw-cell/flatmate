@@ -18,6 +18,7 @@ import 'package:flatmate_app/features/map_around/presentation/providers/map_arou
 import 'package:flatmate_app/features/map_around/presentation/screens/map_around_screen.dart';
 import 'package:flatmate_app/features/map_around/presentation/widgets/map_category_icon_bar.dart';
 import 'package:flatmate_app/features/map_around/presentation/widgets/map_place_card.dart';
+import 'package:flatmate_app/features/map_around/presentation/widgets/map_place_search_overlay.dart';
 import 'package:flatmate_app/features/places/data/repositories/dio_places_repository.dart';
 import 'package:flatmate_app/features/places/domain/models/local_place.dart';
 import 'package:flatmate_app/features/places/domain/repositories/places_repository.dart';
@@ -67,18 +68,20 @@ class _FakeAdapter implements HttpClientAdapter {
 }
 
 class _Places implements PlacesRepository {
-  final calls = <({double lat, double lng, PlaceCategory category})>[];
+  final calls =
+      <({double lat, double lng, PlaceCategory? category, String? q, int radius})>[];
   NearbyPlacesResult result = const NearbyPlacesResult(items: []);
 
   @override
   Future<NearbyPlacesResult> nearby({
     required double lat,
     required double lng,
-    required PlaceCategory category,
+    PlaceCategory? category,
+    String? q,
     int radius = 1000,
     int limit = 20,
   }) async {
-    calls.add((lat: lat, lng: lng, category: category));
+    calls.add((lat: lat, lng: lng, category: category, q: q, radius: radius));
     return result;
   }
 }
@@ -197,6 +200,47 @@ void main() {
       expect(result.items.single.name, '분식집');
       expect(adapter.requests, hasLength(1));
     });
+
+    test('nearby keyword search sends q without category', () async {
+      final tokens = TokenStorage();
+      final adapter = _FakeAdapter((options) {
+        expect(options.queryParameters['q'], '정형외과');
+        expect(options.queryParameters['radius'], 2000);
+        expect(options.queryParameters.containsKey('category'), isFalse);
+        return (
+          200,
+          {
+            'items': [
+              {
+                'place_id': '9',
+                'category': 'MEDICAL',
+                'sub_category': '정형외과',
+                'name': '야탑정형외과',
+                'address': '성남',
+                'lat': 37.41,
+                'lng': 127.13,
+                'distance_m': 80,
+                'place_url': 'http://place.map.kakao.com/9',
+              },
+            ],
+          },
+        );
+      });
+      final config = AppConfig.resolve();
+      final refresher =
+          TokenRefresher(tokens: tokens, baseUrl: config.apiBaseUrl)
+            ..dio.httpClientAdapter = adapter;
+      final api = ApiClient(tokens: tokens, refresher: refresher, config: config);
+      api.dio.httpClientAdapter = adapter;
+
+      final result = await DioPlacesRepository(api).nearby(
+        lat: 37.41,
+        lng: 127.13,
+        q: '정형외과',
+        radius: 2000,
+      );
+      expect(result.items.single.name, '야탑정형외과');
+    });
   });
 
   group('MapAroundNotifier mode', () {
@@ -248,6 +292,57 @@ void main() {
       await container
           .read(mapAroundProvider.notifier)
           .setMode(MapBrowseMode.feeds);
+      state = container.read(mapAroundProvider).value!;
+      expect(state.mode.isFeeds, isTrue);
+      expect(state.items, hasLength(1));
+    });
+
+    test('applySearch then clearSearch restores feeds', () async {
+      final feeds = _Feeds(
+        around: [
+          FeedItem(
+            id: '1',
+            title: '책상',
+            neighborhood: '야탑동',
+            postedAt: DateTime(2026, 10, 24),
+            priceOrCondition: '1만원',
+            thumbnailUrl: '',
+            likeCount: 0,
+            chatCount: 0,
+            category: FeedCategory.market,
+            badges: const [],
+            isBumped: false,
+            latitude: 37.41205,
+            longitude: 127.13027,
+          ),
+        ],
+      );
+      final places = _Places();
+      final container = ProviderContainer(
+        overrides: [
+          feedRepositoryProvider.overrideWithValue(feeds),
+          placesRepositoryProvider.overrideWithValue(places),
+          currentLocationProvider.overrideWith((ref) => _yatap),
+          mapTilesEnabledProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(mapAroundProvider.future);
+
+      final hit = _place(id: 'ortho', name: '야탑정형외과');
+      container.read(mapAroundProvider.notifier).applySearch(
+            query: '정형외과',
+            places: [hit],
+            selected: hit,
+            centerLat: _yatap.latitude,
+            centerLng: _yatap.longitude,
+          );
+      var state = container.read(mapAroundProvider).value!;
+      expect(state.mode.isSearch, isTrue);
+      expect(state.mode.searchQuery, '정형외과');
+      expect(state.selectedPlaceId, 'ortho');
+
+      await container.read(mapAroundProvider.notifier).clearSearch();
       state = container.read(mapAroundProvider).value!;
       expect(state.mode.isFeeds, isTrue);
       expect(state.items, hasLength(1));
@@ -331,5 +426,84 @@ void main() {
     expect(find.byKey(const ValueKey('map-place-p1')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-place-card')), findsOneWidget);
     expect(find.text('카카오맵 상세보기'), findsOneWidget);
+  });
+
+  testWidgets('map search: suggestions → result → card + clear badge',
+      (tester) async {
+    tester.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    final places = _Places()
+      ..result = NearbyPlacesResult(
+        items: [_place(id: 'ortho', name: '야탑정형외과')],
+      );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          feedRepositoryProvider.overrideWithValue(_Feeds()),
+          placesRepositoryProvider.overrideWithValue(places),
+          currentLocationProvider.overrideWith((ref) => _yatap),
+          mapTilesEnabledProvider.overrideWithValue(false),
+          externalUrlLauncherProvider.overrideWithValue((_) async => true),
+        ],
+        child: const MaterialApp(home: MapAroundScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-search-button')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('map-search-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-place-search-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-place-suggest-정형외과')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('map-place-suggest-정형외과')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-place-search-row-ortho')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('map-place-search-row-ortho')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-place-card')), findsOneWidget);
+    expect(find.text('야탑정형외과'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-search-clear-badge')), findsOneWidget);
+    expect(places.calls.last.q, '정형외과');
+    expect(places.calls.last.radius, 2000);
+    expect(places.calls.last.category, isNull);
+
+    await tester.tap(find.byKey(const ValueKey('map-search-clear-badge')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('map-search-clear-badge')), findsNothing);
+    expect(find.byKey(const ValueKey('map-place-card')), findsNothing);
+  });
+
+  testWidgets('search overlay shows hint and clear', (tester) async {
+    final places = _Places();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          placesRepositoryProvider.overrideWithValue(places),
+        ],
+        child: const MaterialApp(
+          home: MapPlaceSearchOverlay(lat: 37.41, lng: 127.13),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('상호명, 업종, 편의시설 검색 (예: 스타벅스, 정형외과)'),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('map-place-search-field')),
+      '다이소',
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('map-place-search-clear')), findsOneWidget);
   });
 }

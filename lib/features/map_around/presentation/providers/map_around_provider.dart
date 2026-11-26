@@ -42,7 +42,7 @@ class MapAroundState {
   final List<MapFeedGroup> groups;
   final String? selectedId;
 
-  /// Places mode.
+  /// Places / keyword-search mode.
   final List<LocalPlace> places;
   final String? selectedPlaceId;
   final String? message;
@@ -85,10 +85,11 @@ class MapAroundState {
   }
 }
 
-/// 동네지도: feed pins within [radiusKm], or nearby places by category.
+/// 동네지도: feed pins, category places, or keyword search places.
 class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
   static const radiusKm = 3.0;
   static const placesRadiusM = 1000;
+  static const searchRadiusM = 2000;
   static const pageSize = 100;
 
   MapBrowseMode _mode = MapBrowseMode.feeds;
@@ -105,10 +106,11 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     MapBrowseMode mode,
   ) async {
     _mode = mode;
-    if (mode is MapBrowsePlaces) {
-      return _loadPlaces(lat, lng, mode.category);
-    }
-    return _loadFeeds(lat, lng);
+    return switch (mode) {
+      MapBrowsePlaces(:final category) => _loadPlacesByCategory(lat, lng, category),
+      MapBrowseSearch(:final query) => _loadPlacesByQuery(lat, lng, query),
+      MapBrowseFeeds() => _loadFeeds(lat, lng),
+    };
   }
 
   Future<MapAroundState> _loadFeeds(double lat, double lng) async {
@@ -142,7 +144,7 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     );
   }
 
-  Future<MapAroundState> _loadPlaces(
+  Future<MapAroundState> _loadPlacesByCategory(
     double lat,
     double lng,
     PlaceCategory category,
@@ -166,6 +168,30 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
     );
   }
 
+  Future<MapAroundState> _loadPlacesByQuery(
+    double lat,
+    double lng,
+    String query,
+  ) async {
+    final result = await ref.read(placesRepositoryProvider).nearby(
+          lat: lat,
+          lng: lng,
+          q: query,
+          radius: searchRadiusM,
+          limit: 20,
+        );
+    return MapAroundState(
+      mode: MapBrowseSearch(query),
+      centerLat: lat,
+      centerLng: lng,
+      items: const [],
+      groups: const [],
+      places: result.items,
+      selectedPlaceId: result.items.firstOrNull?.placeId,
+      message: result.message,
+    );
+  }
+
   Future<void> setMode(MapBrowseMode mode) async {
     if (_mode == mode && state.hasValue) return;
     final current = state.value;
@@ -176,6 +202,46 @@ class MapAroundNotifier extends AsyncNotifier<MapAroundState> {
       await future;
     } catch (_) {}
     state = await AsyncValue.guard(() => _load(lat, lng, mode));
+  }
+
+  /// Apply a keyword search hit: show [places] with [selected] focused.
+  void applySearch({
+    required String query,
+    required List<LocalPlace> places,
+    required LocalPlace selected,
+    required double centerLat,
+    required double centerLng,
+  }) {
+    _mode = MapBrowseSearch(query);
+    final ordered = [
+      selected,
+      ...places.where((p) => p.placeId != selected.placeId),
+    ];
+    state = AsyncData(
+      MapAroundState(
+        mode: MapBrowseSearch(query),
+        centerLat: centerLat,
+        centerLng: centerLng,
+        items: const [],
+        groups: const [],
+        places: ordered,
+        selectedPlaceId: selected.placeId,
+      ),
+    );
+  }
+
+  /// Leave keyword search and restore 피드/공공.
+  Future<void> clearSearch() async {
+    final current = state.value;
+    final lat = current?.centerLat ?? ref.read(currentLocationProvider).latitude;
+    final lng =
+        current?.centerLng ?? ref.read(currentLocationProvider).longitude;
+    try {
+      await future;
+    } catch (_) {}
+    state = await AsyncValue.guard(
+      () => _load(lat, lng, MapBrowseMode.feeds),
+    );
   }
 
   /// "이 지역 재검색" / "내 동네로". Markers stay until the new result lands.
