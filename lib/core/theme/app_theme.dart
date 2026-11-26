@@ -37,14 +37,14 @@ class AppTheme {
           return TextStyle(
             fontSize: 11,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected ? AppColors.primary : AppColors.textHint,
+            color: selected ? AppColors.primary : AppColors.navInactive,
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
             size: 24,
-            color: selected ? AppColors.primary : AppColors.textHint,
+            color: selected ? AppColors.primary : AppColors.navInactive,
           );
         }),
       ),

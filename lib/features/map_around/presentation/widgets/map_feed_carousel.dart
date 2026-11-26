@@ -9,7 +9,7 @@ import '../../../feed/presentation/widgets/feed_thumbnail.dart';
 import '../../../feed/presentation/widgets/festival_badge.dart';
 import '../../../feed/presentation/widgets/public_housing_badge.dart';
 
-/// Horizontal post cards under the map; the selected one has an orange border.
+/// Horizontal post cards under the map; the selected one has a primary border.
 class MapFeedCarousel extends StatelessWidget {
   const MapFeedCarousel({
     super.key,

@@ -20,7 +20,7 @@ class AppSpacing {
       EdgeInsets.symmetric(vertical: sm);
 
   // Component metrics
-  static const double cardRadius = 12.0;
+  static const double cardRadius = 14.0;
   static const double thumbRadius = 10.0;
   static const double chipRadius = 4.0;
   static const double thumbSize = 90.0;

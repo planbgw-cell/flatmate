@@ -17,33 +17,22 @@ class BadgeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    late final Color bgColor;
-    late final Color textColor;
-
-    switch (type) {
-      case BadgeType.urgent:
-        bgColor = AppColors.statusUrgent.withValues(alpha: 0.12);
-        textColor = AppColors.statusUrgent;
-      case BadgeType.success:
-        bgColor = AppColors.statusSuccess.withValues(alpha: 0.12);
-        textColor = AppColors.statusSuccess;
-      case BadgeType.warning:
-        bgColor = AppColors.statusWarning.withValues(alpha: 0.12);
-        textColor = AppColors.statusWarning;
-      case BadgeType.normal:
-        bgColor = AppColors.surface;
-        textColor = AppColors.textSecondary;
-    }
+    final urgent = type == BadgeType.urgent;
+    final bg = urgent ? AppColors.accentLight : AppColors.primaryLight;
+    final textColor = urgent ? AppColors.accent : AppColors.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.0),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(4.0),
+        color: bg,
+        borderRadius: BorderRadius.circular(6.0),
       ),
       child: Text(
         label,
-        style: AppTypography.badgeText.copyWith(color: textColor),
+        style: AppTypography.badgeText.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

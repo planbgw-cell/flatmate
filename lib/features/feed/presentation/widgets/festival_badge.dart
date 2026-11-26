@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/common_widgets/category_badge.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -9,7 +10,7 @@ import '../../domain/models/feed_item.dart';
 class FestivalBadge extends StatelessWidget {
   const FestivalBadge({super.key, this.dense = false, this.label = '축제'});
 
-  static const color = Color(0xFFE5487F);
+  static const color = AppColors.primary;
 
   final bool dense;
 
@@ -18,24 +19,7 @@ class FestivalBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: dense ? 5 : 7,
-        vertical: dense ? 1 : 2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.6)),
-      ),
-      child: Text(
-        label,
-        style: AppTypography.badgeText.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
+    return CategoryBadge(label: label, dense: dense);
   }
 }
 

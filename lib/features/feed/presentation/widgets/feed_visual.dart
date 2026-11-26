@@ -5,46 +5,32 @@ import '../../domain/models/feed_item.dart';
 import 'public_job_banner.dart';
 import 'public_share_banner.dart';
 
-/// Icon + color per post kind, shared by thumbnails placeholders and map pins.
+/// Icon + brand color per post kind (sage primary for all categories).
 ({IconData icon, Color color}) feedVisual(FeedItem item) {
+  const brand = AppColors.primary;
   if (item.isFestival) {
-    return (icon: Icons.celebration, color: const Color(0xFFE5487F));
+    return (icon: Icons.celebration, color: brand);
   }
   final housing = item.housingType;
   if (housing != null) {
     return switch (housing) {
-      HousingType.happyHouse => (
-          icon: Icons.home_work,
-          color: const Color(0xFF16A34A),
-        ),
-      HousingType.youthHouse => (
-          icon: Icons.school,
-          color: const Color(0xFF4F46E5),
-        ),
-      HousingType.publicRental => (
-          icon: Icons.location_city,
-          color: const Color(0xFF0D9488),
-        ),
+      HousingType.happyHouse => (icon: Icons.home_work, color: brand),
+      HousingType.youthHouse => (icon: Icons.school, color: brand),
+      HousingType.publicRental => (icon: Icons.location_city, color: brand),
     };
   }
   if (item.isPublicJob) {
     final kind = JobBannerKind.fromTitle(item.title);
-    return (icon: kind.icon, color: kind.primary);
+    return (icon: kind.icon, color: brand);
   }
   if (item.isPublicShare) {
     final kind = ShareBannerKind.fromItem(item);
-    return (icon: kind.icon, color: kind.primary);
+    return (icon: kind.icon, color: brand);
   }
   return switch (item.category) {
-    FeedCategory.housing => (
-        icon: Icons.apartment,
-        color: const Color(0xFF3B82F6),
-      ),
-    FeedCategory.job => (icon: Icons.work, color: const Color(0xFF10B981)),
-    FeedCategory.community => (
-        icon: Icons.campaign,
-        color: const Color(0xFF8B5CF6),
-      ),
-    _ => (icon: Icons.shopping_bag, color: AppColors.primary),
+    FeedCategory.housing => (icon: Icons.apartment, color: brand),
+    FeedCategory.job => (icon: Icons.work, color: brand),
+    FeedCategory.community => (icon: Icons.campaign, color: brand),
+    _ => (icon: Icons.shopping_bag, color: brand),
   };
 }

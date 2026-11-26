@@ -38,7 +38,7 @@ class FeedFilterBar extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
             selectedColor: AppColors.primary,
-            backgroundColor: AppColors.surface,
+            backgroundColor: AppColors.cardBackground,
             side: BorderSide(
               color: isSelected ? AppColors.primary : AppColors.border,
             ),

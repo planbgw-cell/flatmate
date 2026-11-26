@@ -114,15 +114,17 @@ class _IconChip extends StatelessWidget {
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: selected ? AppColors.primary : AppColors.surface,
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.cardBackground,
                 border: Border.all(
-                  color: selected ? AppColors.primary : AppColors.divider,
+                  color: selected ? AppColors.primary : AppColors.border,
                 ),
               ),
               child: Icon(
                 item.icon,
                 size: 22,
-                color: selected ? Colors.white : AppColors.textSecondary,
+                color: selected ? Colors.white : AppColors.iconMuted,
               ),
             ),
             const SizedBox(height: 6),

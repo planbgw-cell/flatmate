@@ -143,12 +143,15 @@ class _Chip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         label,
-        style: AppTypography.badgeText.copyWith(color: AppColors.primary),
+        style: AppTypography.badgeText.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
