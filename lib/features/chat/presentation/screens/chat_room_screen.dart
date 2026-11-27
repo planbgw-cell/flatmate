@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/routes/route_names.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -146,7 +147,15 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       ),
       body: Column(
         children: [
-          if (room != null) ChatProductHeader(room: room),
+          if (room != null)
+            ChatProductHeader(
+              room: room,
+              onTap: room.feedItemId.isEmpty
+                  ? null
+                  : () => context.push(
+                        RouteNames.feedDetailPath(room.feedItemId),
+                      ),
+            ),
           Expanded(
             child: messagesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),

@@ -20,6 +20,7 @@ class FavoritesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authProvider).value;
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('관심목록')),
       body: user == null
           ? Padding(
@@ -69,25 +70,61 @@ class _LikesBody extends ConsumerWidget {
       onRefresh: () => ref.refresh(myLikesProvider.future),
       child: items.isEmpty
           ? ListView(
+              key: const ValueKey('favorites-empty'),
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
-                const SizedBox(height: 80),
+                const SizedBox(height: 96),
+                const Icon(
+                  Icons.favorite_border_rounded,
+                  size: 48,
+                  color: AppColors.iconMuted,
+                ),
+                const SizedBox(height: AppSpacing.md),
                 Text(
-                  '관심 표시한 글이 없어요.\n마음에 드는 글에 하트를 눌러 보세요.',
+                  '홈에서 관심 있는 방이나 동네 소식을 담아보세요',
                   textAlign: TextAlign.center,
-                  style: AppTypography.bodyMedium,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Center(
+                  child: FilledButton(
+                    key: const ValueKey('favorites-go-home'),
+                    onPressed: () => context.go(RouteNames.home),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.cardRadius),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.sm,
+                      ),
+                    ),
+                    child: Text(
+                      '홈으로',
+                      style: AppTypography.titleMedium.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             )
-          : ListView.separated(
+          : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, index) {
                 final item = items[index];
                 return MyFeedTile(
                   key: ValueKey('my-like-${item.id}'),
                   item: item,
+                  asCard: true,
+                  showClosedBadge: true,
                   onTap: () => context.push(
                     RouteNames.feedDetail,
                     extra: item,
@@ -97,7 +134,7 @@ class _LikesBody extends ConsumerWidget {
                     tooltip: '관심 해제',
                     icon: const Icon(
                       Icons.favorite_rounded,
-                      color: AppColors.primary,
+                      color: AppColors.accent,
                     ),
                     onPressed: () async {
                       final messenger = ScaffoldMessenger.of(context);

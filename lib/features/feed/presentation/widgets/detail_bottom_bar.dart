@@ -35,7 +35,7 @@ class DetailBottomBar extends StatelessWidget {
   final VoidCallback? onSecondaryPressed;
 
   static final _shape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(AppSpacing.xs),
+    borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
   );
 
   Widget _primary() => FilledButton(
@@ -83,7 +83,7 @@ class DetailBottomBar extends StatelessWidget {
 
     return Material(
       elevation: 8,
-      color: AppColors.background,
+      color: AppColors.cardBackground,
       child: Container(
         padding: EdgeInsets.fromLTRB(
           AppSpacing.sm,

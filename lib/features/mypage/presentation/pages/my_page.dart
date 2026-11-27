@@ -74,7 +74,7 @@ class MyPage extends ConsumerWidget {
             dense: true,
             leading: const Icon(
               Icons.block,
-              color: AppColors.textSecondary,
+              color: AppColors.iconMuted,
             ),
             title: Text('차단 사용자 관리', style: AppTypography.bodyLarge),
             trailing: const Icon(
@@ -83,7 +83,7 @@ class MyPage extends ConsumerWidget {
             ),
             onTap: () => context.push(RouteNames.blockedUsers),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AppColors.divider),
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -100,7 +100,7 @@ class MyPage extends ConsumerWidget {
               ),
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: AppColors.divider),
           const Expanded(child: _MyFeedsTab()),
         ],
       ),
@@ -120,56 +120,61 @@ class _ProfileHeader extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.md,
-        AppSpacing.xs,
         AppSpacing.md,
+        AppSpacing.sm,
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.primaryContainer,
-            backgroundImage:
-                avatar == null ? null : CachedNetworkImageProvider(avatar),
-            child: avatar == null
-                ? const Icon(Icons.person, color: AppColors.primary)
-                : null,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.nickname,
-                  key: const ValueKey('profile-nickname'),
-                  style: AppTypography.header2,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  user.primaryLocation == null
-                      ? '대표 동네를 설정해 주세요'
-                      : '대표 동네 · ${user.primaryLocation!.fullName}',
-                  style: AppTypography.bodyMedium,
-                ),
-              ],
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: AppColors.primaryContainer,
+              backgroundImage:
+                  avatar == null ? null : CachedNetworkImageProvider(avatar),
+              child: avatar == null
+                  ? const Icon(Icons.person, color: AppColors.primary)
+                  : null,
             ),
-          ),
-          TextButton(
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('로그아웃되었습니다.')),
-              );
-            },
-            child: Text(
-              '로그아웃',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.nickname,
+                    key: const ValueKey('profile-nickname'),
+                    style: AppTypography.header2,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    user.primaryLocation == null
+                        ? '대표 동네를 설정해 주세요'
+                        : '대표 동네 · ${user.primaryLocation!.fullName}',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            TextButton(
+              onPressed: () async {
+                await ref.read(authProvider.notifier).logout();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('로그아웃되었습니다.')),
+                );
+              },
+              child: Text(
+                '로그아웃',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -186,7 +191,7 @@ class _NoticesMenuTile extends StatelessWidget {
       dense: true,
       leading: const Icon(
         Icons.campaign_outlined,
-        color: AppColors.textSecondary,
+        color: AppColors.iconMuted,
       ),
       title: Text('공지사항', style: AppTypography.bodyLarge),
       trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
@@ -316,7 +321,8 @@ class _AsyncList extends StatelessWidget {
           : ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: AppColors.divider),
               itemBuilder: (_, index) => itemBuilder(items[index]),
             ),
     );

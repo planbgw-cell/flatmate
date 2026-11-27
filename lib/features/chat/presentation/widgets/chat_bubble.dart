@@ -30,7 +30,7 @@ class ChatBubble extends StatelessWidget {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: mine ? AppColors.primary : AppColors.surface,
+        color: mine ? AppColors.primary : AppColors.cardBackground,
         borderRadius: BorderRadius.only(
           topLeft: const Radius.circular(16),
           topRight: const Radius.circular(16),

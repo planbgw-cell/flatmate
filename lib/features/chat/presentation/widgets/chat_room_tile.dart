@@ -124,12 +124,13 @@ class ChatRoomTile extends StatelessWidget {
                       if (room.unreadCount > 0) ...[
                         const SizedBox(width: 8),
                         Container(
+                          key: ValueKey('room-unread-${room.id}'),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 7,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary,
+                            color: AppColors.accent,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(

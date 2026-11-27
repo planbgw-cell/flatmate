@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -14,19 +15,30 @@ class MyFeedTile extends StatelessWidget {
     required this.item,
     required this.onTap,
     required this.trailing,
+    this.asCard = false,
+    this.showClosedBadge = false,
   });
 
   final FeedItem item;
   final VoidCallback onTap;
   final Widget trailing;
 
+  /// When true, wraps content in a bordered radius-14 card (관심목록).
+  final bool asCard;
+
+  /// When true and [TradeStatus.completed], shows 「마감됨」 instead of 거래완료.
+  final bool showClosedBadge;
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final row = InkWell(
       onTap: onTap,
+      borderRadius: asCard
+          ? BorderRadius.circular(AppSpacing.cardRadius)
+          : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
+        padding: EdgeInsets.symmetric(
+          horizontal: asCard ? AppSpacing.sm : AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
         child: Row(
@@ -46,7 +58,11 @@ class MyFeedTile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      if (item.tradeStatus != TradeStatus.selling) ...[
+                      if (showClosedBadge &&
+                          item.tradeStatus == TradeStatus.completed) ...[
+                        const _ClosedBadge(),
+                        const SizedBox(width: 6),
+                      ] else if (item.tradeStatus != TradeStatus.selling) ...[
                         TradeStatusBadge(
                           key: ValueKey('my-badge-${item.id}'),
                           status: item.tradeStatus,
@@ -83,6 +99,46 @@ class MyFeedTile extends StatelessWidget {
             ),
             trailing,
           ],
+        ),
+      ),
+    );
+
+    if (!asCard) return row;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: row,
+      ),
+    );
+  }
+}
+
+class _ClosedBadge extends StatelessWidget {
+  const _ClosedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('closed-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.accentLight,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '마감됨',
+        style: AppTypography.badgeText.copyWith(
+          color: AppColors.accent,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

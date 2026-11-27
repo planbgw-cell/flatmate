@@ -26,75 +26,83 @@ class AuthorProfileCard extends StatelessWidget {
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primaryContainer,
-            backgroundImage: item.authorAvatarUrl != null
-                ? CachedNetworkImageProvider(item.authorAvatarUrl!)
-                : null,
-            child: item.authorAvatarUrl == null
-                ? Text(
-                    item.authorName.characters.first,
-                    style: AppTypography.titleMedium.copyWith(
-                      color: AppColors.primary,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.authorName, style: AppTypography.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  '${item.neighborhood} 인증 ${item.verificationCount}회',
-                  style: AppTypography.bodyMedium,
-                ),
-              ],
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.primaryContainer,
+              backgroundImage: item.authorAvatarUrl != null
+                  ? CachedNetworkImageProvider(item.authorAvatarUrl!)
+                  : null,
+              child: item.authorAvatarUrl == null
+                  ? Text(
+                      item.authorName.characters.first,
+                      style: AppTypography.titleMedium.copyWith(
+                        color: AppColors.primary,
+                      ),
+                    )
+                  : null,
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.thermostat, size: 16, color: _scoreColor),
-                  const SizedBox(width: 2),
+                  Text(item.authorName, style: AppTypography.titleMedium),
+                  const SizedBox(height: 2),
                   Text(
-                    '${item.trustScore.toStringAsFixed(1)}°C',
-                    style: AppTypography.titleMedium.copyWith(
-                      color: _scoreColor,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    '${item.neighborhood} 인증 ${item.verificationCount}회',
+                    style: AppTypography.bodyMedium,
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: 88,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: AppColors.border,
-                    color: _scoreColor,
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.thermostat, size: 16, color: _scoreColor),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${item.trustScore.toStringAsFixed(1)}°C',
+                      style: AppTypography.titleMedium.copyWith(
+                        color: _scoreColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: 88,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: AppColors.border,
+                      color: _scoreColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                item.trustPercentLabel,
-                style: AppTypography.caption.copyWith(color: _scoreColor),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(height: 2),
+                Text(
+                  item.trustPercentLabel,
+                  style: AppTypography.caption.copyWith(color: _scoreColor),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

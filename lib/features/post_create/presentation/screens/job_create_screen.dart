@@ -83,10 +83,18 @@ class _JobCreateScreenState extends ConsumerState<JobCreateScreen> {
         hintText: hint,
         hintStyle: AppTypography.bodyMedium,
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: AppColors.cardBackground,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: AppColors.border),
         ),
       );
 
